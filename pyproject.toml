@@ -4,6 +4,6 @@ requires = [
     "wheel",
 ]
 dependencies = [
-
+    "paho-mqtt",
 ]
 build-backend = "setuptools.build_meta"
