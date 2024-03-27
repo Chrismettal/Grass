@@ -34,6 +34,41 @@ Might be pushed to Pypi later idk.
 
 TODO
 
+## GPIO mapping
+
+This code is intended to be run on a [PiPLC](https://github.com/chrismettal/piplc) running regular `PiOS` but theoretically it's possible to be run on a bare Pi with some I/O attached.
+
+| GPIO Name | PiPLC function           | Ottogrow                                          |
+| :-------: | :----------------------- | :------------------------------------------------ |
+| `GPIO_02` | :blue_square: I²C SDA    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
+| `GPIO_03` | :blue_square: I²C SCL    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
+| `GPIO_04` | :blue_square: Modbus TX  | -                                                 |
+| `GPIO_05` | :blue_square: Modbus RX  | -                                                 |
+| `GPIO_06` | :blue_square: Modbus RTS | -                                                 |
+| `GPIO_07` | :red_square: Q4          |                                                   |
+| `GPIO_08` | :red_square: Q3          | 230 V Exhaust                                     |
+| `GPIO_09` | :yellow_square: I5       |                                                   |
+| `GPIO_10` | :yellow_square: I4       |                                                   |
+| `GPIO_11` | :yellow_square: I6       |                                                   |
+| `GPIO_12` | :red_square: Q5          | 24 V Water Pump                                   |
+| `GPIO_13` | :yellow_square: I7       |                                                   |
+| `GPIO_14` | :blue_square: KNX TX     | -                                                 |
+| `GPIO_15` | :blue_square: KNX RX     | -                                                 |
+| `GPIO_16` | :red_square: Q6          | 24 V Circulation fan                              |
+| `GPIO_17` | :yellow_square: I1       |                                                   |
+| `GPIO_18` | :orange_square: PWM_0    | Circulation Fan speed                             |
+| `GPIO_19` | :orange_square: PWM_1    |                                                   |
+| `GPIO_20` | :red_square: Q7          |                                                   |
+| `GPIO_21` | :red_square: Q8          |                                                   |
+| `GPIO_22` | :yellow_square: I3       |                                                   |
+| `GPIO_23` | :blue_square: 1-Wire     | `DS18B20` Soil / Water temp                       |
+| `GPIO_24` | :red_square: Q1          | 230 V Light                                       |
+| `GPIO_25` | :red_square: Q2          | 230 V Heater                                      |
+| `GPIO_26` | :yellow_square: I8       |                                                   |
+| `GPIO_27` | :yellow_square: I2       |                                                   |
+
+![Schematic](/doc/PiPLC_Testboard.drawio.svg)
+
 ## Roadmap
 
 - [ ] Create roadmap

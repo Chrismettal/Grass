@@ -24,7 +24,7 @@ mqttPort        = "1883"
 mqttClientId    = "ottogrow"
 mqttUsername    = "Username"
 mqttPassword    = "Password"
-mqttTopicOutput = "ottogrow/outputs/#"
+mqttTopicOutput = "ottogrow/outputs/"
 mqttTopicInput  = "ottogrow/inputs/#"
 
 # Machine parameters, set through recipe or MQTT outputs
@@ -40,6 +40,7 @@ AirCircTime     = 60    # Time in minutes between air circulations
 LightSet        = 2000  # Target brightness in Lux
 LightOn         = 1     # Binary output of Light switch. TODO Only controlled via MQTT for now
 CameraTime      = 15    # Time in minutes between camera pictures
+SensorInterval  = 30    # Interval to measure inputs in seconds
 
 # Machine thinkinge
 lastCameraSnap  = 0
@@ -47,6 +48,11 @@ lastAirCirc     = 0
 runFan          = 0
 runHeater       = 0
 runLight        = 0
+lastWaterOff    = 0
+lastSensors     = 0
+
+# GPIO mapping
+
 
 #############################################################################
 ##                               Helpers                                   ##
@@ -86,20 +92,47 @@ def machineCode():
     if now > lastCameraSnap + (CameraTime * 60):
         # Snap a pic
         lastCameraSnap = now
+        print("Taking Snapshot")
+
+    # Measure sensors
+    if now > lastSensors + SensorInterval:
+        lastSensors = now
+
+        # Measure soil humidities
+        # TODO
+        soilMoistAvg = 50
+
+        # Measure water temp
+        # TODO
+
+        # Measure light brightness
+        # TODO
+
+        # Measure Air temp and humidity
+        # TODO
+        AirTemp = 15
+        AirHum  = 50
 
     # Heater
-    # TODO
+    if AirTemp < AirTempSet - airTempHyst:
+        runHeater = 1
+        print("Heater On")
+    elif AirTemp < AirtTempSet + airTempHyst:
+        runHeater = 0
+        print("Heater Off")
 
     # Circulation
     # If time since last circulation exceeded the setpoint:
     if now > lastAirCirc + (AirCircTime * 60):
         # Turn fan on
         runFan = 1
+        print("Circulation fan on")
         # If time since last circulation exceeded the setpoint + fan duration:
         if now > lastAirCirc + (AirCircTime * 60) + (AirCircDuration):
             # Turn fan off and remember circulation time
             runFan = 0
             lastAirCirc = now
+            print("Circulation fan off")
 
     # Venting
     # TODO
@@ -107,7 +140,22 @@ def machineCode():
     # Lighting
     # TODO
 
-    # Watering (Blocking so we don't risk keeping water on)
+    # Watering
+    # TODO HwOutputs
+    # Never attempt watering if WateringPulseOff hasn't elapsed yet
+    if now > lastWaterOff + WateringPulseOff:
+        if soilMoistAvg < SoilMoistSet:
+            runPump = 1
+            print("Water pump on")
+            sleep(WateringPulseOn) # (Blocking so we don't risk keeping water on)
+            runPump = 0
+            print("Water pump off")
+            lastWaterOff = now
+
+    # MQTT cyclic updates
+    # TODO
+
+    # HW Output updates
     # TODO
 
 #############################################################################
