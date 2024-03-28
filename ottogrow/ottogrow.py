@@ -14,6 +14,7 @@ import paho.mqtt.client as mqtt
 
 # Sensors
 from adafruit_seesaw.seesaw import Seesaw
+import board
 import libds1̋8b20
 
 #############################################################################
@@ -107,6 +108,10 @@ def sensorSetup():
         ss = Seesaw(i2c_bus, addr=address)
         soilSensors.append(ss)
 
+    # Light sensor
+    lightSensor = adafruit_bh1750.BH1750(i2c)
+    
+
 
 # Actual machine code
 def machineCode():
@@ -145,12 +150,17 @@ def machineCode():
         infot.wait_for_publish()
 
         # Measure light brightness
-        # TODO
+        print("%.2f Lux" % lightSensor.lux)
+        topic = mqttTopicOutput + "brightness"
+        mqttc.publish(topic, str(lightSensor.lux), qos=mqttQos)
 
         # Measure Air temp and humidity
         # TODO
         AirTemp = 15
         AirHum  = 50
+
+        # Measure water level in reservoir
+        # TODO
 
     # Heater
     if AirTemp < AirTempSet - airTempHyst:
