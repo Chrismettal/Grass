@@ -13,8 +13,9 @@ import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
 
 # Sensors
-from adafruit_seesaw.seesaw import Seesaw
 import board
+from adafruit_seesaw.seesaw import Seesaw
+import adafruit_ahtx0
 import libds1̋8b20
 
 #############################################################################
@@ -101,9 +102,11 @@ def pahoSetup():
 
 # Sensor setup
 def sensorSetup():
-    # Stemma soil moisture sensor
+    # I2C Adafruit
     # TODO correct I2C pins?
     i2c_bus = board.I2C()
+     
+    # Stemma soil moisture sensor
     for address in SOIL_MOIST_ADR:
         ss = Seesaw(i2c_bus, addr=address)
         soilSensors.append(ss)
@@ -111,6 +114,8 @@ def sensorSetup():
     # Light sensor
     lightSensor = adafruit_bh1750.BH1750(i2c)
     
+    # Temp / Air hum sensor
+    airSensor = adafruit_ahtx0.AHTx0(board.I2C())
 
 
 # Actual machine code
@@ -155,10 +160,11 @@ def machineCode():
         mqttc.publish(topic, str(lightSensor.lux), qos=mqttQos)
 
         # Measure Air temp and humidity
-        # TODO
-        AirTemp = 15
-        AirHum  = 50
-
+        AirTemp = airSensor.temperature
+        AirHum  = airSensor.relative_humidity
+        print("Air temperature: %0.1f C" % sensor.temperature)
+        print("Air humidity: %0.1f %%" % sensor.relative_humidity)
+dasdasda
         # Measure water level in reservoir
         # TODO
 
