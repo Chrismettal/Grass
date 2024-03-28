@@ -12,6 +12,10 @@ import time
 import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
 
+# Sensors
+from adafruit_seesaw.seesaw import Seesaw
+import libds1̋8b20
+
 #############################################################################
 ##                           Global variables                              ##
 #############################################################################
@@ -26,13 +30,14 @@ mqttUsername    = "Username"
 mqttPassword    = "Password"
 mqttTopicOutput = "ottogrow/outputs/"
 mqttTopicInput  = "ottogrow/inputs/#"
+mqttQos         = 2
 
 # Machine parameters, set through recipe or MQTT outputs
 controlMode     = "local"
 airTempSet      = 20    # Air Temperature setpoint in C
 airTempHyst     = 1     # Hysterysis for AirTemperature contoller
 airHumMax       = 90    # Maximum air humidity in % before ventilation starts
-SoilMoistSet    = 50    # Soil moisture setpoint in %
+SoilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
 WateringPulseOn = 10    # How long the water can be turned on
 WateringPulseOff= 30    # How long the water needs to be off
 AirCircDuration = 30    # Duration of air circulation when triggered
@@ -50,9 +55,17 @@ runHeater       = 0
 runLight        = 0
 lastWaterOff    = 0
 lastSensors     = 0
+soilSensors     = []    # List of soil sensor entities
+topic           = ""
+payload         = ""
 
 # GPIO mapping
 
+#############################################################################
+##                           Global Constants                              ##
+#############################################################################
+# Stemma soil adresses
+SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 
 #############################################################################
 ##                               Helpers                                   ##
@@ -61,13 +74,16 @@ lastSensors     = 0
 def on_connect(client, userdata, flags, rc, properties=None):
     print("Connection established")
 
+
 # Callback on received message
 def callback(client, userdata, message):
     print("Message received: " + str(message.payload.decode("utf-8")))
 
+
 # Subscription successful
 def on_subscribe(client, userdata, mid, granted_ops, properties=None):
     print("On subscribe called!!")
+
 
 # Paho setup
 def pahoSetup():
@@ -80,6 +96,16 @@ def pahoSetup():
     mqttc.subscribe(mqttTopicOutput, qos=1)
     # Start the mqtt loop, no intension to ever end
     mqttc.loop_start()
+
+
+# Sensor setup
+def sensorSetup():
+    # Stemma soil moisture sensor
+    # TODO correct I2C pins?
+    i2c_bus = board.I2C()
+    for address in SOIL_MOIST_ADR:
+        ss = Seesaw(i2c_bus, addr=address)
+        soilSensors.append(ss)
 
 
 # Actual machine code
@@ -98,12 +124,25 @@ def machineCode():
     if now > lastSensors + SensorInterval:
         lastSensors = now
 
-        # Measure soil humidities
-        # TODO
-        soilMoistAvg = 50
+        # Measure soil humidities and temperatures
+        soilMoistAvg = 0
+        for idx, soilSensor in enumerate(soilSensors):
+            soilTemp        = soilSensor.moisture_read()
+            soilMoist       = soilSensor.get_temp()
+            soilMoistAvg    = soilMoistAvg + soilMoist
+            print("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
+            topic = mqttTopicOutput + "bucketmoists/" + str(idx)
+            mqttc.publish(topic, str(soilMoist), qos=mqttQos)
+            topic = mqttTopicOutput + "buckettemps/" + str(idx)
+            mqttc.publish(topic, str(soilTemp), qos=mqttQos)
+            infot.wait_for_publish()
+        soilMoistAvg = soilMoistAvg / len(soilSensors)
 
         # Measure water temp
-        # TODO
+        waterTemp = ds18b20_read_temp()
+        topic = mqttTopicOutput + "watertemp"
+        mqttc.publish(topic, str(waterTemp), qos=mqttQos)
+        infot.wait_for_publish()
 
         # Measure light brightness
         # TODO
@@ -152,9 +191,6 @@ def machineCode():
             print("Water pump off")
             lastWaterOff = now
 
-    # MQTT cyclic updates
-    # TODO
-
     # HW Output updates
     # TODO
 
@@ -168,6 +204,9 @@ def main():
 
     # Paho setup
     pahoSetup()
+
+    # Sensor setup
+    sensorSetup()
 
     # Machine code
     while(1):

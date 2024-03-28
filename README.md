@@ -1,4 +1,4 @@
-# ottogrow <!-- omit in toc -->
+# Ottogrow <!-- omit in toc -->
 
 [![PyPI - Version](https://img.shields.io/pypi/v/ottogrow?style=flat-square)](https://pypi.org/project/ottogrow/)
 [![Repo Version](https://img.shields.io/github/v/tag/chrismettal/ottogrow?label=RepoVersion&style=flat-square)](https://github.com/Chrismettal/ottogrow)
@@ -11,6 +11,10 @@ This is a work in progress.
 **If you like my work please consider [supporting me](https://github.com/Chrismettal#donations)!**
 
 ## Installation
+
+### Prerequisites
+
+- Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) on your pi
 
 ### Pypi
 
@@ -30,6 +34,10 @@ Might be pushed to Pypi later idk.
 
 `pip install -e .`
 
+- Open up `./ottogrow/ottogrow.py` and modify the global parameters at the top to fit your needs.
+
+- Execute `ottogrow` in to run the software. Potentially configure your OS to autorun at boot.
+
 ## Usage
 
 TODO
@@ -42,9 +50,9 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 | :-------: | :----------------------- | :------------------------------------------------ |
 | `GPIO_02` | :blue_square: I²C SDA    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
 | `GPIO_03` | :blue_square: I²C SCL    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
-| `GPIO_04` | :blue_square: Modbus TX  | -                                                 |
-| `GPIO_05` | :blue_square: Modbus RX  | -                                                 |
-| `GPIO_06` | :blue_square: Modbus RTS | -                                                 |
+| `GPIO_04` | :blue_square: Modbus TX  | :x:                                               |
+| `GPIO_05` | :blue_square: Modbus RX  | :x:                                               |
+| `GPIO_06` | :blue_square: Modbus RTS | :x:                                               |
 | `GPIO_07` | :red_square: Q4          |                                                   |
 | `GPIO_08` | :red_square: Q3          | 230 V Exhaust                                     |
 | `GPIO_09` | :yellow_square: I5       |                                                   |
@@ -52,9 +60,9 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 | `GPIO_11` | :yellow_square: I6       |                                                   |
 | `GPIO_12` | :red_square: Q5          | 24 V Water Pump                                   |
 | `GPIO_13` | :yellow_square: I7       |                                                   |
-| `GPIO_14` | :blue_square: KNX TX     | -                                                 |
-| `GPIO_15` | :blue_square: KNX RX     | -                                                 |
-| `GPIO_16` | :red_square: Q6          | 24 V Circulation fan                              |
+| `GPIO_14` | :blue_square: KNX TX     | :x:                                               |
+| `GPIO_15` | :blue_square: KNX RX     | :x:                                               |
+| `GPIO_16` | :red_square: Q6          | 24 V Circulation fan  (2 x 12v fans in series)    |
 | `GPIO_17` | :yellow_square: I1       |                                                   |
 | `GPIO_18` | :orange_square: PWM_0    | Circulation Fan speed                             |
 | `GPIO_19` | :orange_square: PWM_1    |                                                   |
