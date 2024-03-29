@@ -8,6 +8,7 @@ import os
 import sys
 import glob
 import time
+import datetime
 
 import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
@@ -17,12 +18,13 @@ import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
 import libds1̋8b20
+import cv2
 
 #############################################################################
 ##                           Global variables                              ##
 #############################################################################
 # General
-
+snapLocation     = "~/OttoScreenshots/"
 
 # MQTT
 mqttBroker      = "127.0.0.1"
@@ -40,16 +42,16 @@ airTempSet      = 20    # Air Temperature setpoint in C
 airTempHyst     = 1     # Hysterysis for AirTemperature contoller
 airHumMax       = 90    # Maximum air humidity in % before ventilation starts
 SoilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
-WateringPulseOn = 10    # How long the water can be turned on
-WateringPulseOff= 30    # How long the water needs to be off
-AirCircDuration = 30    # Duration of air circulation when triggered
-AirCircTime     = 60    # Time in minutes between air circulations
-LightSet        = 2000  # Target brightness in Lux
-LightOn         = 1     # Binary output of Light switch. TODO Only controlled via MQTT for now
-CameraTime      = 15    # Time in minutes between camera pictures
-SensorInterval  = 30    # Interval to measure inputs in seconds
+wateringPulseOn = 10    # How long the water can be turned on
+wateringPulseOff= 30    # How long the water needs to be off
+airCircDuration = 30    # Duration of air circulation when triggered
+airCircTime     = 60    # Time in minutes between air circulations
+lightSet        = 2000  # Target brightness in Lux
+lightOn         = 1     # Binary output of Light switch. TODO Only controlled via MQTT for now
+cameraTime      = 15    # Time in minutes between camera pictures
+sensorInterval  = 30    # Interval to measure inputs in seconds
 
-# Machine thinkinge
+# Machine thinking
 lastCameraSnap  = 0
 lastAirCirc     = 0
 runFan          = 0
@@ -69,6 +71,7 @@ payload         = ""
 # Stemma soil adresses
 SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 
+
 #############################################################################
 ##                               Helpers                                   ##
 #############################################################################
@@ -84,7 +87,7 @@ def callback(client, userdata, message):
 
 # Subscription successful
 def on_subscribe(client, userdata, mid, granted_ops, properties=None):
-    print("On subscribe called!!")
+    print("On subscribe called")
 
 
 # Paho setup
@@ -100,6 +103,15 @@ def pahoSetup():
     mqttc.loop_start()
 
 
+# Picture snapper
+def snapPicture():
+    ret, image = cam.read()
+    if not ret:
+        print("failed to snap picture")
+        return
+    cv2.imwrite(snapLocation + datetime.datetime.now(), image)
+    cam.release()
+
 # Sensor setup
 def sensorSetup():
     # I2C Adafruit
@@ -112,11 +124,13 @@ def sensorSetup():
         soilSensors.append(ss)
 
     # Light sensor
-    lightSensor = adafruit_bh1750.BH1750(i2c)
+    lightSensor = adafruit_bh1750.BH1750(i2c_bus)
     
     # Temp / Air hum sensor
-    airSensor = adafruit_ahtx0.AHTx0(board.I2C())
+    airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
 
+    # Camera
+    cam = cv2.VideoCapture(0)
 
 # Actual machine code
 def machineCode():
@@ -124,11 +138,11 @@ def machineCode():
     now = time.time()
 
     # Camera Snapshot
-    # TODO
     if now > lastCameraSnap + (CameraTime * 60):
         # Snap a pic
         lastCameraSnap = now
         print("Taking Snapshot")
+        snapPicture()
 
     # Measure sensors
     if now > lastSensors + SensorInterval:
@@ -136,15 +150,20 @@ def machineCode():
 
         # Measure soil humidities and temperatures
         soilMoistAvg = 0
+        # Iterate through all connected sensors
         for idx, soilSensor in enumerate(soilSensors):
+            # Grab inputs
             soilTemp        = soilSensor.moisture_read()
             soilMoist       = soilSensor.get_temp()
             soilMoistAvg    = soilMoistAvg + soilMoist
             print("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
+            # Send moisture
             topic = mqttTopicOutput + "bucketmoists/" + str(idx)
             mqttc.publish(topic, str(soilMoist), qos=mqttQos)
+            # Send temperature
             topic = mqttTopicOutput + "buckettemps/" + str(idx)
             mqttc.publish(topic, str(soilTemp), qos=mqttQos)
+            # Wait for publish complete
             infot.wait_for_publish()
         soilMoistAvg = soilMoistAvg / len(soilSensors)
 
@@ -164,7 +183,15 @@ def machineCode():
         AirHum  = airSensor.relative_humidity
         print("Air temperature: %0.1f C" % sensor.temperature)
         print("Air humidity: %0.1f %%" % sensor.relative_humidity)
-dasdasda
+        # Send humidity
+        topic = mqttTopicOutput + "airhum"
+        mqttc.publish(topic, str(AirHum), qos=mqttQos)
+        # Send temperature
+        topic = mqttTopicOutput + "airtemp"
+        mqttc.publish(topic, str(AirTemp), qos=mqttQos)
+        # Wait for publish complete
+        infot.wait_for_publish()
+
         # Measure water level in reservoir
         # TODO
 
@@ -193,7 +220,7 @@ dasdasda
     # TODO
 
     # Lighting
-    # TODO
+    # TODO also PWM output
 
     # Watering
     # TODO HwOutputs
@@ -209,6 +236,7 @@ dasdasda
 
     # HW Output updates
     # TODO
+
 
 #############################################################################
 ##                               main()                                    ##
