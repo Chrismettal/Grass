@@ -5,7 +5,7 @@
 # for printing with less waste
 
 # Secrets
-import mqttLogin.py
+import mqttsecrets
 
 import os
 import sys
@@ -16,7 +16,7 @@ import datetime
 # import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
 
-# Sensors
+# Sensors 
 import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
@@ -90,12 +90,12 @@ def on_subscribe(client, userdata, mid, granted_ops, properties=None):
 
 # Paho setup
 def pahoSetup():
-    mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=mqttClientId)
+    mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=mqttsecrets.ClientId)
     mqttc.on_message = callback
     mqttc.on_connect = on_connect
     mqttc.on_subscribe = on_subscribe
-    mqttc.username_pw_set(mqttUsername, mqttPassword)
-    mqttc.connect(mqttBroker, mqttPort)
+    mqttc.username_pw_set(mqttsecrets.Username, mqttsecrets.Password)
+    mqttc.connect(mqttsecrets.Broker, mqttsecrets.Port)
     mqttc.subscribe(mqttTopicOutput, qos=1)
     # Start the mqtt loop, no intension to ever end
     mqttc.loop_start()
