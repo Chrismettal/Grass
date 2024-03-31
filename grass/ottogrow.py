@@ -10,14 +10,14 @@ import glob
 import time
 import datetime
 
-import context  # Ensures paho is in PYTHONPATH
+# import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
 
 # Sensors
 import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
-import libds1̋8b20
+import libds18b20
 import cv2
 
 #############################################################################

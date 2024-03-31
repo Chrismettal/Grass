@@ -4,6 +4,8 @@ if __name__ == "__main__":
     setup(
         install_requires=[
         'paho-mqtt',
-        'adafruit-circuitpython-seesaw'
+        'adafruit-circuitpython-seesaw',
+        'adafruit-circuitpython-ahtx0',
+        'opencv-python'
         ],
     )
