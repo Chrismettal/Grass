@@ -10,7 +10,11 @@ This is a work in progress.
 
 ### Prerequisites
 
-- Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) on your pi
+- Either create a Python venv or be prepared to `--break-system-packages`
+
+- Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) on your Pi
+
+- Run `sudo apt install ffmpeg libsm6 libxext6` to get OpenCV dependencies
 
 ### Pypi
 
