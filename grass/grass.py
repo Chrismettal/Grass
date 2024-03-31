@@ -4,6 +4,9 @@
 # Command line tool to consolidate several DHL labels 
 # for printing with less waste
 
+# Secrets
+import mqttLogin.py
+
 import os
 import sys
 import glob
@@ -27,11 +30,6 @@ import cv2
 snapLocation     = "~/Grass/Screenshots/"
 
 # MQTT
-mqttBroker      = "127.0.0.1"
-mqttPort        = 1883
-mqttClientId    = "grass"
-mqttUsername    = "Username"
-mqttPassword    = "Password"
 mqttTopicOutput = "grass/outputs/"
 mqttTopicInput  = "grass/inputs/#"
 mqttQos         = 2
@@ -117,6 +115,8 @@ def sensorSetup():
     # I2C Adafruit
     # TODO correct I2C pins?
     i2c_bus = board.I2C()
+
+    # TODO catch non-present sensors
      
     # Stemma soil moisture sensor
     for address in SOIL_MOIST_ADR:
@@ -243,10 +243,11 @@ def machineCode():
 #############################################################################
 def main():
     print("---------------------")
-    print("--Starting grass--")
+    print("---Starting  Grass---")
     print("---------------------")
 
     # Paho setup
+    # TODO wait here and retry until paho was able to connect
     pahoSetup()
 
     # Sensor setup
@@ -257,6 +258,7 @@ def main():
         machineCode()
         time.sleep(1)
 
+        # TODO if any device is missing, re-call sensorSetup() until it is
 
 #############################################################################
 ##                         main() idiom                                    ##
