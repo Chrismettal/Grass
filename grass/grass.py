@@ -17,7 +17,7 @@ import paho.mqtt.client as mqtt
 import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
-import libds18b20
+#import libds18b20
 import cv2
 
 #############################################################################
@@ -28,7 +28,7 @@ snapLocation     = "~/Grass/Screenshots/"
 
 # MQTT
 mqttBroker      = "127.0.0.1"
-mqttPort        = "1883"
+mqttPort        = 1883
 mqttClientId    = "grass"
 mqttUsername    = "Username"
 mqttPassword    = "Password"
@@ -92,7 +92,7 @@ def on_subscribe(client, userdata, mid, granted_ops, properties=None):
 
 # Paho setup
 def pahoSetup():
-    mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=clientId)
+    mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=mqttClientId)
     mqttc.on_message = callback
     mqttc.on_connect = on_connect
     mqttc.on_subscribe = on_subscribe
@@ -168,7 +168,7 @@ def machineCode():
         soilMoistAvg = soilMoistAvg / len(soilSensors)
 
         # Measure water temp
-        waterTemp = ds18b20_read_temp()
+        waterTemp = 69 #ds18b20_read_temp()
         topic = mqttTopicOutput + "watertemp"
         mqttc.publish(topic, str(waterTemp), qos=mqttQos)
         infot.wait_for_publish()
