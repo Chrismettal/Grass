@@ -50,7 +50,7 @@ cameraTime      = 15    # Time in minutes between camera pictures
 sensorInterval  = 30    # Interval to measure inputs in seconds
 
 # Machine thinking
-lastCameraSnap  = 0
+lastCameraSnap  = 1
 lastAirCirc     = 0
 runFan          = 0
 runHeater       = 0
@@ -119,26 +119,31 @@ def sensorSetup():
     # TODO catch non-present sensors
      
     # Stemma soil moisture sensor
-    for address in SOIL_MOIST_ADR:
-        ss = Seesaw(i2c_bus, addr=address)
-        soilSensors.append(ss)
+    # for address in SOIL_MOIST_ADR:
+    #     ss = Seesaw(i2c_bus, addr=address)
+    #     soilSensors.append(ss)
 
     # Light sensor
-    lightSensor = adafruit_bh1750.BH1750(i2c_bus)
+    # lightSensor = adafruit_bh1750.BH1750(i2c_bus)
     
     # Temp / Air hum sensor
-    airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
+    # airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
 
     # Camera
     cam = cv2.VideoCapture(0)
 
 # Actual machine code
 def machineCode():
+
+    global lastCameraSnap, lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
+    global controlMode, airTempSet, airTempHyst, airHumMax, SoilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
+    global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
+
     # Remember timestamp
     now = time.time()
 
     # Camera Snapshot
-    if now > lastCameraSnap + (CameraTime * 60):
+    if now > lastCameraSnap + (cameraTime * 60):
         # Snap a pic
         lastCameraSnap = now
         print("Taking Snapshot")
