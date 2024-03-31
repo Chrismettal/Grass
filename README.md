@@ -1,9 +1,5 @@
-# Ottogrow <!-- omit in toc -->
+# Grass <!-- omit in toc -->
 
-[![PyPI - Version](https://img.shields.io/pypi/v/ottogrow?style=flat-square)](https://pypi.org/project/ottogrow/)
-[![Repo Version](https://img.shields.io/github/v/tag/chrismettal/ottogrow?label=RepoVersion&style=flat-square)](https://github.com/Chrismettal/ottogrow)
-[![PyPI - License](https://img.shields.io/pypi/l/ottogrow?style=flat-square)](https://pypi.org/project/ottogrow/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ottogrow?style=flat-square)](https://pypi.org/project/ottogrow/)
 [![Donations: Coffee](https://img.shields.io/badge/donations-Coffee-brown?style=flat-square)](https://github.com/Chrismettal#donations)
 
 This is a work in progress.
@@ -24,19 +20,19 @@ Might be pushed to Pypi later idk.
 
 - Clone the repo:
 
-`git clone https://github.com/chrismettal/ottogrow`
+`git clone https://github.com/chrismettal/grass`
 
 - Change directory into said cloned repo:
 
-`cd ottogrow`
+`cd grass`
 
 - Install in "editable" mode:
 
 `pip install -e .`
 
-- Open up `./ottogrow/ottogrow.py` and modify the global parameters at the top to fit your needs.
+- Open up `./grass/grass.py` and modify the global parameters at the top to fit your needs.
 
-- Execute `ottogrow` in to run the software. Potentially configure your OS to autorun at boot.
+- Execute `grass` in to run the software. Potentially configure your OS to autorun at boot.
 
 ## Usage
 
@@ -46,7 +42,7 @@ TODO
 
 This code is intended to be run on a [PiPLC](https://github.com/chrismettal/piplc) running regular `PiOS` but theoretically it's possible to be run on a bare Pi with some I/O attached.
 
-| GPIO Name | PiPLC function           | Ottogrow                                          |
+| GPIO Name | PiPLC function           | grass                                          |
 | :-------: | :----------------------- | :------------------------------------------------ |
 | `GPIO_02` | :blue_square: I²C SDA    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
 | `GPIO_03` | :blue_square: I²C SCL    | `BH1750` light / `AHT20` temp/hum / Soil moisture |

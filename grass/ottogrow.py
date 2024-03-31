@@ -1,5 +1,5 @@
 #############################################################################
-##                              ottogrow                                    ##
+##                              grass                                    ##
 #############################################################################
 # Command line tool to consolidate several DHL labels 
 # for printing with less waste
@@ -24,16 +24,16 @@ import cv2
 ##                           Global variables                              ##
 #############################################################################
 # General
-snapLocation     = "~/OttoScreenshots/"
+snapLocation     = "~/Grass/Screenshots/"
 
 # MQTT
 mqttBroker      = "127.0.0.1"
 mqttPort        = "1883"
-mqttClientId    = "ottogrow"
+mqttClientId    = "grass"
 mqttUsername    = "Username"
 mqttPassword    = "Password"
-mqttTopicOutput = "ottogrow/outputs/"
-mqttTopicInput  = "ottogrow/inputs/#"
+mqttTopicOutput = "grass/outputs/"
+mqttTopicInput  = "grass/inputs/#"
 mqttQos         = 2
 
 # Machine parameters, set through recipe or MQTT outputs
@@ -243,7 +243,7 @@ def machineCode():
 #############################################################################
 def main():
     print("---------------------")
-    print("--Starting Ottogrow--")
+    print("--Starting grass--")
     print("---------------------")
 
     # Paho setup
