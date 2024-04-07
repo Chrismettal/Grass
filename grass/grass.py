@@ -12,6 +12,7 @@ import sys
 import glob
 import time
 import datetime
+import RPi.GPIO as GPIO
 
 # import context  # Ensures paho is in PYTHONPATH
 import paho.mqtt.client as mqtt
@@ -39,7 +40,7 @@ controlMode     = "local"
 airTempSet      = 20    # Air Temperature setpoint in C
 airTempHyst     = 1     # Hysterysis for AirTemperature contoller
 airHumMax       = 90    # Maximum air humidity in % before ventilation starts
-SoilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
+soilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
 wateringPulseOn = 10    # How long the water can be turned on
 wateringPulseOff= 30    # How long the water needs to be off
 airCircDuration = 30    # Duration of air circulation when triggered
@@ -61,7 +62,26 @@ soilSensors     = []    # List of soil sensor entities
 topic           = ""
 payload         = ""
 
+###################
 # GPIO mapping
+###################
+# Pin Config
+digitalInputs   = [17, 27, 22, 10,  9, 11, 13, 26]  # I1 - I8
+digitalOutputs  = [24, 25,  8,  7, 12, 16, 20, 21]  # Q1 - Q8
+pwmOutputs      = [18, 19]
+oneWire         = [23]
+
+# Digital Inputs
+
+# Relays
+relayLight      = 24    # Q1
+relayHeater     = 25    # Q2
+relayExhaust    =  8    # Q3
+relayWater      = 12    # Q5
+relayCirc       = 16    # Q6
+
+# PWM
+pwmCircFan      = 18    # PWM 1 
 
 #############################################################################
 ##                           Global Constants                              ##
@@ -90,19 +110,21 @@ def on_subscribe(client, userdata, mid, granted_ops, properties=None):
 
 # Paho setup
 def pahoSetup():
+    global mqttc
     mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=mqttsecrets.ClientId)
     mqttc.on_message = callback
     mqttc.on_connect = on_connect
     mqttc.on_subscribe = on_subscribe
     mqttc.username_pw_set(mqttsecrets.Username, mqttsecrets.Password)
     mqttc.connect(mqttsecrets.Broker, mqttsecrets.Port)
-    mqttc.subscribe(mqttTopicOutput, qos=1)
+    mqttc.subscribe(mqttTopicInput, qos=1)
     # Start the mqtt loop, no intension to ever end
     mqttc.loop_start()
 
 
 # Picture snapper
 def snapPicture():
+    global cam
     ret, image = cam.read()
     if not ret:
         print("failed to snap picture")
@@ -112,6 +134,18 @@ def snapPicture():
 
 # Sensor setup
 def sensorSetup():
+    global cam
+
+    # Pin setup
+    GPIO.setmode(GPIO.BCM)
+    for pin in digitalOutputs:
+        GPIO.setup(pin, GPIO.OUT)
+    for pin in digitalInputs:
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    for pin in pwmOutputs:
+        GPIO.setup(pin, GPIO.OUT)
+        #TODO
+
     # I2C Adafruit
     # TODO correct I2C pins?
     i2c_bus = board.I2C()
@@ -134,9 +168,10 @@ def sensorSetup():
 
 # Actual machine code
 def machineCode():
-
+    # Import global vars
     global lastCameraSnap, lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
-    global controlMode, airTempSet, airTempHyst, airHumMax, SoilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
+    global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
+    global airTemp, airHum
     global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
 
     # Remember timestamp
@@ -150,7 +185,7 @@ def machineCode():
         snapPicture()
 
     # Measure sensors
-    if now > lastSensors + SensorInterval:
+    if now > lastSensors + sensorInterval:
         lastSensors = now
 
         # Measure soil humidities and temperatures
@@ -162,85 +197,98 @@ def machineCode():
             soilMoist       = soilSensor.get_temp()
             soilMoistAvg    = soilMoistAvg + soilMoist
             print("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
+
             # Send moisture
             topic = mqttTopicOutput + "bucketmoists/" + str(idx)
-            mqttc.publish(topic, str(soilMoist), qos=mqttQos)
+            infot = mqttc.publish(topic, str(soilMoist), qos=mqttQos)
+            infot.wait_for_publish()
+
             # Send temperature
             topic = mqttTopicOutput + "buckettemps/" + str(idx)
-            mqttc.publish(topic, str(soilTemp), qos=mqttQos)
-            # Wait for publish complete
+            infot = mqttc.publish(topic, str(soilTemp), qos=mqttQos)
             infot.wait_for_publish()
-        soilMoistAvg = soilMoistAvg / len(soilSensors)
+
+        if len(soilSensors) > 0:
+            soilMoistAvg = soilMoistAvg / len(soilSensors)
 
         # Measure water temp
-        waterTemp = 69 #ds18b20_read_temp()
+        waterTemp = 69 #ds18b20_read_temp() #TODO
         topic = mqttTopicOutput + "watertemp"
-        mqttc.publish(topic, str(waterTemp), qos=mqttQos)
+        infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
         infot.wait_for_publish()
 
         # Measure light brightness
-        print("%.2f Lux" % lightSensor.lux)
+        #print("%.2f Lux" % lightSensor.lux)
+        print("%.2f Lux" % 123)
         topic = mqttTopicOutput + "brightness"
-        mqttc.publish(topic, str(lightSensor.lux), qos=mqttQos)
+        infot = mqttc.publish(topic, str(123), qos=mqttQos) # TODO
+        infot.wait_for_publish()
 
-        # Measure Air temp and humidity
-        AirTemp = airSensor.temperature
-        AirHum  = airSensor.relative_humidity
-        print("Air temperature: %0.1f C" % sensor.temperature)
-        print("Air humidity: %0.1f %%" % sensor.relative_humidity)
+        # Measure Air temp and humidity TODO
+        airTemp = 67 # airSensor.temperature
+        airHum  = 99 # airSensor.relative_humidity
+        print("Air temperature: %0.1f C" % airTemp)
+        print("Air humidity: %0.1f %%" % airHum)
+
         # Send humidity
         topic = mqttTopicOutput + "airhum"
-        mqttc.publish(topic, str(AirHum), qos=mqttQos)
+        infot = mqttc.publish(topic, str(airHum), qos=mqttQos)
+        infot.wait_for_publish()
+
         # Send temperature
         topic = mqttTopicOutput + "airtemp"
-        mqttc.publish(topic, str(AirTemp), qos=mqttQos)
-        # Wait for publish complete
+        infot = mqttc.publish(topic, str(airTemp), qos=mqttQos)
         infot.wait_for_publish()
 
         # Measure water level in reservoir
         # TODO
 
     # Heater
-    if AirTemp < AirTempSet - airTempHyst:
+    if airTemp < (airTempSet - airTempHyst):
         runHeater = 1
         print("Heater On")
-    elif AirTemp < AirtTempSet + airTempHyst:
+    elif airTemp < (airTempSet + airTempHyst):
         runHeater = 0
         print("Heater Off")
 
     # Circulation
     # If time since last circulation exceeded the setpoint:
-    if now > lastAirCirc + (AirCircTime * 60):
+    if now > lastAirCirc + (airCircTime * 60):
         # Turn fan on
         runFan = 1
         print("Circulation fan on")
         # If time since last circulation exceeded the setpoint + fan duration:
-        if now > lastAirCirc + (AirCircTime * 60) + (AirCircDuration):
+        if now > lastAirCirc + (airCircTime * 60) + (airCircDuration):
             # Turn fan off and remember circulation time
             runFan = 0
             lastAirCirc = now
             print("Circulation fan off")
 
-    # Venting
+    # Exhaust
     # TODO
+    runExhaust = False
 
     # Lighting
     # TODO also PWM output
 
     # Watering
-    # TODO HwOutputs
+    soilMoistAvg = 9999
     # Never attempt watering if WateringPulseOff hasn't elapsed yet
-    if now > lastWaterOff + WateringPulseOff:
-        if soilMoistAvg < SoilMoistSet:
-            runPump = 1
+    if now > lastWaterOff + wateringPulseOff:
+        if soilMoistAvg < soilMoistSet:
+            GPIO.output(relayWater, True)
             print("Water pump on")
-            sleep(WateringPulseOn) # (Blocking so we don't risk keeping water on)
-            runPump = 0
+            time.sleep(wateringPulseOn) # (Blocking so we don't risk keeping water on)
+            GPIO.output(relayWater, False)
             print("Water pump off")
             lastWaterOff = now
 
     # HW Output updates
     # TODO
+    GPIO.output(relayLight,     runLight)
+    GPIO.output(relayHeater,    runHeater)
+    GPIO.output(relayExhaust,   runExhaust)
+    GPIO.output(relayCirc,      runFan)
 
 
 #############################################################################
