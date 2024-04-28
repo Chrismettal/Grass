@@ -208,6 +208,7 @@ def sensorSetup():
     # Camera
     try:
         cam = cv2.VideoCapture(0)
+        cameraOK = FALSE #TODO
     except:
         print("Camera instancing didn't work!")
         cameraOK = False
