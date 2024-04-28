@@ -46,7 +46,7 @@ wateringPulseOff= 30    # How long the water needs to be off
 airCircDuration = 30    # Duration of air circulation when triggered
 airCircTime     = 60    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
-lightOn         = 1     # Binary output of Light switch. TODO Only controlled via MQTT for now
+lightOn         = 1     # Binary output of Light switch
 cameraTime      = 15    # Time in minutes between camera pictures
 sensorInterval  = 30    # Interval to measure inputs in seconds
 
@@ -61,6 +61,13 @@ lastSensors     = 0
 soilSensors     = []    # List of soil sensor entities
 topic           = ""
 payload         = ""
+
+# Sensor states
+CameraOK        = True
+mqttOK          = False
+allStemmasOK    = True
+lightSensorOK   = True
+airSensorOK     = True
 
 ###################
 # GPIO mapping
@@ -95,20 +102,25 @@ SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 #############################################################################
 # Paho connection established
 def on_connect(client, userdata, flags, rc, properties=None):
+    global mqttOK
     print("Connection established")
+    mqttOK = True
 
-
+#######################################
 # Callback on received message
+#######################################
 def callback(client, userdata, message):
     print("Message received: " + str(message.payload.decode("utf-8")))
 
-
+#######################################
 # Subscription successful
+#######################################
 def on_subscribe(client, userdata, mid, granted_ops, properties=None):
     print("On subscribe called")
 
-
+#######################################
 # Paho setup
+#######################################
 def pahoSetup():
     global mqttc
     mqttc = mqtt.Client(callback_api_version = mqtt.CallbackAPIVersion.VERSION2, client_id=mqttsecrets.ClientId)
@@ -121,8 +133,9 @@ def pahoSetup():
     # Start the mqtt loop, no intension to ever end
     mqttc.loop_start()
 
-
+#######################################
 # Picture snapper
+#######################################
 def snapPicture():
     global cam
     ret, image = cam.read()
@@ -132,9 +145,12 @@ def snapPicture():
     cv2.imwrite(snapLocation + datetime.datetime.now(), image)
     cam.release()
 
+#######################################
 # Sensor setup
+#######################################
 def sensorSetup():
     global cam
+    global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
 
     # Pin setup
     GPIO.setmode(GPIO.BCM)
@@ -142,108 +158,183 @@ def sensorSetup():
         GPIO.setup(pin, GPIO.OUT)
     for pin in digitalInputs:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-    for pin in pwmOutputs:
-        GPIO.setup(pin, GPIO.OUT)
-        #TODO
+    #for pin in pwmOutputs:
+    #    GPIO.setup(pin, GPIO.OUT)
+    #    #TODO
 
     # I2C Adafruit
-    # TODO correct I2C pins?
     i2c_bus = board.I2C()
 
-    # TODO catch non-present sensors
-     
     # Stemma soil moisture sensor
-    # for address in SOIL_MOIST_ADR:
-    #     ss = Seesaw(i2c_bus, addr=address)
-    #     soilSensors.append(ss)
+    for address in SOIL_MOIST_ADR:
+        try:
+            ss = Seesaw(i2c_bus, addr=address)
+            soilSensors.append(ss)
+        except stemmaException:
+            print("Stemma soil sensor " + str(address) + " not found!")
+            allStemmasOK = False
 
     # Light sensor
-    # lightSensor = adafruit_bh1750.BH1750(i2c_bus)
-    
+    try:
+        lightSensor = adafruit_bh1750.BH1750(i2c_bus)
+    except lightException:
+        print("Light sensor couldn't be added!")
+        lightSensorOK = False
+
     # Temp / Air hum sensor
-    # airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
+    try:
+        airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
+    except airException:
+        print("Air sensor couldn't be found!")
+        airSensorOK = False
 
     # Camera
-    cam = cv2.VideoCapture(0)
+    try:
+        cam = cv2.VideoCapture(0)
+    except cameraInstanceException:
+        print("Camera instancing didn't work!")
+        cameraOK = False
 
+    # Upload detected sensor states to MQTT
+    try:
+        # Stemmas
+        topic = mqttTopicOutput + "sensorstates/soil"
+        infot = mqttc.publish(topic, str(allStemmasOK), qos=mqttQos)
+        infot.wait_for_publish()
+        # Light
+        topic = mqttTopicOutput + "sensorstates/light"
+        infot = mqttc.publish(topic, str(lightSensorOK), qos=mqttQos)
+        infot.wait_for_publish()
+        # Air
+        topic = mqttTopicOutput + "sensorstates/air"
+        infot = mqttc.publish(topic, str(airSensorOK), qos=mqttQos)
+        infot.wait_for_publish()
+        # Camera
+        topic = mqttTopicOutput + "sensorstates/camera"
+        infot = mqttc.publish(topic, str(cameraOK), qos=mqttQos)
+        infot.wait_for_publish()
+    except soilSensorMQTTException:
+        print("Sending sensor states to MQTT didn't work!")
+
+#######################################
 # Actual machine code
+#######################################
 def machineCode():
     # Import global vars
     global lastCameraSnap, lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
     global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
+    global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
 
     # Remember timestamp
     now = time.time()
 
+    # ---------------------------------
     # Camera Snapshot
-    if now > lastCameraSnap + (cameraTime * 60):
+    # ---------------------------------
+    if cameraOK and now > lastCameraSnap + (cameraTime * 60):
         # Snap a pic
         lastCameraSnap = now
         print("Taking Snapshot")
-        snapPicture()
+        try:
+            snapPicture()
+        except cameraSnapException:
+            print("Taking picture didn't work!")
 
+    # ---------------------------------
     # Measure sensors
+    # ---------------------------------
     if now > lastSensors + sensorInterval:
         lastSensors = now
 
+        # -----------------------------
         # Measure soil humidities and temperatures
+        # -----------------------------
         soilMoistAvg = 0
         # Iterate through all connected sensors
         for idx, soilSensor in enumerate(soilSensors):
-            # Grab inputs
-            soilTemp        = soilSensor.moisture_read()
-            soilMoist       = soilSensor.get_temp()
+            # Grab soil inputs
+            try:
+                soilTemp        = soilSensor.moisture_read()
+                soilMoist       = soilSensor.get_temp()
+            except soilSensorException:
+                print("Soil sensor " + str(idx) + " reading didn't work!")
+
             soilMoistAvg    = soilMoistAvg + soilMoist
             print("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
 
-            # Send moisture
-            topic = mqttTopicOutput + "bucketmoists/" + str(idx)
-            infot = mqttc.publish(topic, str(soilMoist), qos=mqttQos)
-            infot.wait_for_publish()
-
-            # Send temperature
-            topic = mqttTopicOutput + "buckettemps/" + str(idx)
-            infot = mqttc.publish(topic, str(soilTemp), qos=mqttQos)
-            infot.wait_for_publish()
+            try:
+                # Send moisture
+                topic = mqttTopicOutput + "bucketmoists/" + str(idx)
+                infot = mqttc.publish(topic, str(soilMoist), qos=mqttQos)
+                infot.wait_for_publish()
+                # Send temperature
+                topic = mqttTopicOutput + "buckettemps/" + str(idx)
+                infot = mqttc.publish(topic, str(soilTemp), qos=mqttQos)
+                infot.wait_for_publish()
+            except soilSensorMQTTException:
+                print("Sending soil sensor " + str(idx) + " to MQTT didn't work!")
 
         if len(soilSensors) > 0:
             soilMoistAvg = soilMoistAvg / len(soilSensors)
 
+        # -----------------------------
         # Measure water temp
-        waterTemp = 69 #ds18b20_read_temp() #TODO
-        topic = mqttTopicOutput + "watertemp"
-        infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
-        infot.wait_for_publish()
+        # -----------------------------
+        try:
+            waterTemp = ds18b20_read_temp()
+        except waterTempException:
+            print("Reading water temperature didn't work!")
+        try:
+            topic = mqttTopicOutput + "watertemp"
+            infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
+            infot.wait_for_publish()
+        except waterTempMQTTException:
+            print("Sending water temperature to MQTT didn't work!")
 
+        # -----------------------------
         # Measure light brightness
-        #print("%.2f Lux" % lightSensor.lux)
-        print("%.2f Lux" % 123)
-        topic = mqttTopicOutput + "brightness"
-        infot = mqttc.publish(topic, str(123), qos=mqttQos) # TODO
-        infot.wait_for_publish()
+        # -----------------------------
+        try:
+            print("%.2f Lux" % 123)
+            topic = mqttTopicOutput + "brightness"
+            infot = mqttc.publish(topic, str(123), qos=mqttQos) # TODO
+            infot.wait_for_publish()
+        except lightSensorException:
+            print("Reading or sending Light Sensor didn't work!")
 
-        # Measure Air temp and humidity TODO
-        airTemp = 67 # airSensor.temperature
-        airHum  = 99 # airSensor.relative_humidity
-        print("Air temperature: %0.1f C" % airTemp)
-        print("Air humidity: %0.1f %%" % airHum)
+        # -----------------------------
+        # Measure Air temp and humidity
+        # -----------------------------
+        # TODO
+        try:
+            airTemp = airSensor.temperature
+            airHum  = airSensor.relative_humidity
+            print("Air temperature: %0.1f C" % airTemp)
+            print("Air humidity: %0.1f %%" % airHum)
+        except airSensorException:
+            print("Reading the air sensor didn't work!")
+        try:
+            # Send humidity
+            topic = mqttTopicOutput + "airhum"
+            infot = mqttc.publish(topic, str(airHum), qos=mqttQos)
+            infot.wait_for_publish()
+            # Send temperature
+            topic = mqttTopicOutput + "airtemp"
+            infot = mqttc.publish(topic, str(airTemp), qos=mqttQos)
+            infot.wait_for_publish()
+        except airSensorMQTTException:
+            print("Sending air sensor to MQTT didn't work!")
 
-        # Send humidity
-        topic = mqttTopicOutput + "airhum"
-        infot = mqttc.publish(topic, str(airHum), qos=mqttQos)
-        infot.wait_for_publish()
-
-        # Send temperature
-        topic = mqttTopicOutput + "airtemp"
-        infot = mqttc.publish(topic, str(airTemp), qos=mqttQos)
-        infot.wait_for_publish()
-
+        # -----------------------------
         # Measure water level in reservoir
+        # -----------------------------
         # TODO
 
+    # ---------------------------------
     # Heater
+    # ---------------------------------
     if airTemp < (airTempSet - airTempHyst):
         runHeater = 1
         print("Heater On")
@@ -251,7 +342,9 @@ def machineCode():
         runHeater = 0
         print("Heater Off")
 
+    # ---------------------------------
     # Circulation
+    # ---------------------------------
     # If time since last circulation exceeded the setpoint:
     if now > lastAirCirc + (airCircTime * 60):
         # Turn fan on
@@ -264,14 +357,20 @@ def machineCode():
             lastAirCirc = now
             print("Circulation fan off")
 
+    # ---------------------------------
     # Exhaust
+    # ---------------------------------
     # TODO
     runExhaust = False
 
+    # ---------------------------------
     # Lighting
+    # ---------------------------------
     # TODO also PWM output
 
+    # ---------------------------------
     # Watering
+    # ---------------------------------
     soilMoistAvg = 9999
     # Never attempt watering if WateringPulseOff hasn't elapsed yet
     if now > lastWaterOff + wateringPulseOff:
@@ -283,7 +382,9 @@ def machineCode():
             print("Water pump off")
             lastWaterOff = now
 
+    # ---------------------------------
     # HW Output updates
+    # ---------------------------------
     # TODO
     GPIO.output(relayLight,     runLight)
     GPIO.output(relayHeater,    runHeater)
@@ -299,9 +400,15 @@ def main():
     print("---Starting  Grass---")
     print("---------------------")
 
+    global mqttOK
+
     # Paho setup
-    # TODO wait here and retry until paho was able to connect
-    pahoSetup()
+    while not mqttOK:
+        try:
+            pahoSetup()
+        except pahoException:
+            print("Paho setup failed!")
+        machine.sleep(3)
 
     # Sensor setup
     sensorSetup()
@@ -311,7 +418,6 @@ def main():
         machineCode()
         time.sleep(1)
 
-        # TODO if any device is missing, re-call sensorSetup() until it is
 
 #############################################################################
 ##                         main() idiom                                    ##
