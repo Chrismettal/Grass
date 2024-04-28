@@ -2,7 +2,23 @@
 
 [![Donations: Coffee](https://img.shields.io/badge/donations-Coffee-brown?style=flat-square)](https://github.com/Chrismettal#donations)
 
-This is a work in progress.
+This is a python-cased controller for a growbox using [PiPLC](https://github.com/Chrismettal/PiPLC) hardware. It's meant to be run on a Raspberry Pi mounted to your growbox. 
+Most sensors are wired using `I²C` so you don't end up running 50 wires through the box. 
+
+It features:
+
+- Lighting schedule
+    - Light dimming
+- Exhaust fan (Temp / Humidity based)
+    - Exhaust speed control
+- Circulation fan schedule
+    - Circulation fan speed control
+- Heating
+- Watering (Soil humidity / schedule based)
+    - Water resorvoir level measurement
+    - Water resorvoir temperature measurement
+- Air Temperature / Humidity measurement
+- Soil Temperatur / Humidity measurement for 4 buckets
 
 **If you like my work please consider [supporting me](https://github.com/Chrismettal#donations)!**
 
@@ -12,7 +28,7 @@ This is a work in progress.
 
 - Either create a Python venv or be prepared to `--break-system-packages`
 
-- Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) on your Pi
+- Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) for our sensor dependencies
 
 - Run `sudo apt install ffmpeg libsm6 libxext6` to get OpenCV dependencies
 
@@ -36,7 +52,7 @@ Might be pushed to Pypi later idk.
 
 - Open up `./grass/grass.py` and modify the global parameters at the top to fit your needs.
 
-- Execute `grass` in to run the software. Potentially configure your OS to autorun at boot.
+- Execute `grass` to run the software. Potentially configure your OS to autorun at boot.
 
 ## Usage
 
@@ -46,14 +62,14 @@ TODO
 
 This code is intended to be run on a [PiPLC](https://github.com/chrismettal/piplc) running regular `PiOS` but theoretically it's possible to be run on a bare Pi with some I/O attached.
 
-| GPIO Name | PiPLC function           | grass                                          |
+| GPIO Name | PiPLC function           | grass                                             |
 | :-------: | :----------------------- | :------------------------------------------------ |
 | `GPIO_02` | :blue_square: I²C SDA    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
 | `GPIO_03` | :blue_square: I²C SCL    | `BH1750` light / `AHT20` temp/hum / Soil moisture |
 | `GPIO_04` | :blue_square: Modbus TX  | :x:                                               |
 | `GPIO_05` | :blue_square: Modbus RX  | :x:                                               |
 | `GPIO_06` | :blue_square: Modbus RTS | :x:                                               |
-| `GPIO_07` | :red_square: Q4          |                                                   |
+| `GPIO_07` | :red_square: Q4          | *230 V spare*                                     |
 | `GPIO_08` | :red_square: Q3          | 230 V Exhaust                                     |
 | `GPIO_09` | :yellow_square: I5       |                                                   |
 | `GPIO_10` | :yellow_square: I4       |                                                   |
@@ -63,11 +79,11 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 | `GPIO_14` | :blue_square: KNX TX     | :x:                                               |
 | `GPIO_15` | :blue_square: KNX RX     | :x:                                               |
 | `GPIO_16` | :red_square: Q6          | 24 V Circulation fan  (2 x 12v fans in series)    |
-| `GPIO_17` | :yellow_square: I1       |                                                   |
-| `GPIO_18` | :orange_square: PWM_0    | Circulation Fan speed                             |
+| `GPIO_17` | :yellow_square: I1       | S0 energy meter                                   |
+| `GPIO_18` | :orange_square: PWM_0    |                                                   |
 | `GPIO_19` | :orange_square: PWM_1    |                                                   |
-| `GPIO_20` | :red_square: Q7          |                                                   |
-| `GPIO_21` | :red_square: Q8          |                                                   |
+| `GPIO_20` | :red_square: Q7          | *24 V spare*                                      |
+| `GPIO_21` | :red_square: Q8          | *24 V spare*                                      |
 | `GPIO_22` | :yellow_square: I3       |                                                   |
 | `GPIO_23` | :blue_square: 1-Wire     | `DS18B20` Soil / Water temp                       |
 | `GPIO_24` | :red_square: Q1          | 230 V Light                                       |
@@ -79,7 +95,26 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 
 ## Roadmap
 
-- [ ] Create roadmap
+- [x] Create Roadmap
+- [x] GPIO working
+- [x] Light schedule works
+- [ ] All sensors can be read
+- [ ] Power meter works
+    - [ ] And saves its memory in the same place every time
+- [ ] Circulation logic works
+- [ ] Exhaust logic works
+- [ ] Heater logic works
+- [ ] Watering logic works
+- [ ] Timelapse feature works
+    - [ ] Camera still accessible as webcam stream
+- [ ] All print statements become log statements
+- [ ] Autostart on machine boot
+- [ ] Oneshot MQTT states get sent cyclically
+- [ ] MQTT "last will" invalidate sensor states
+- [ ] Sensors that aren't present at machine start get detected without restart
+- [ ] Get control parameters through MQTT
+- [ ] MQTT output overrides
+- [ ] MQTT advertising
 
 ## Donations
 
