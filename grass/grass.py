@@ -1,34 +1,33 @@
 #############################################################################
-##                              grass                                    ##
+##                               GRASS                                     ##
 #############################################################################
-# Command line tool to consolidate several DHL labels 
-# for printing with less waste
+# PiPLC / Raspberry Pi based controller for a growtent
 
 # Secrets
 import mqttsecrets
 
+# General libraries
 import os
 import sys
 import glob
 import time
 import datetime
+# GPIO
 import RPi.GPIO as GPIO
-
-# import context  # Ensures paho is in PYTHONPATH
+# MQTT
 import paho.mqtt.client as mqtt
-
 # Sensors 
 import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
-#import libds18b20
+import libds18b20
 import cv2
 
 #############################################################################
 ##                           Global variables                              ##
 #############################################################################
 # General
-snapLocation     = "~/Grass/Screenshots/"
+snapLocation    = "~/GrassSnaps/"
 
 # MQTT
 mqttTopicOutput = "grass/outputs/"
@@ -49,6 +48,7 @@ lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
 cameraTime      = 15    # Time in minutes between camera pictures
 sensorInterval  = 30    # Interval to measure inputs in seconds
+s0kWhPerPulse   = 0.1   # kWH to be added to total counter per pulse
 
 # Machine thinking
 lastCameraSnap  = 1
@@ -61,6 +61,9 @@ lastSensors     = 0
 soilSensors     = []    # List of soil sensor entities
 topic           = ""
 payload         = ""
+lightOnTime     = 3     # Hour at which light is switched on 
+lightOffTime    = 21    # Hour at which light is switched off
+energyUsed      = 0.0   # Total energy used in kwh
 
 # Sensor states
 CameraOK        = True
@@ -79,6 +82,7 @@ pwmOutputs      = [18, 19]
 oneWire         = [23]
 
 # Digital Inputs
+S0counter       = 17
 
 # Relays
 relayLight      = 24    # Q1
@@ -96,11 +100,19 @@ pwmCircFan      = 18    # PWM 1
 # Stemma soil adresses
 SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 
-
 #############################################################################
 ##                               Helpers                                   ##
 #############################################################################
+#######################################
+# S0 counter
+#######################################
+def s0callback():
+    global energyUsed
+    energyUsed += s0kWhPerPulse
+
+#######################################
 # Paho connection established
+#######################################
 def on_connect(client, userdata, flags, rc, properties=None):
     global mqttOK
     print("Connection established")
@@ -161,6 +173,10 @@ def sensorSetup():
     #for pin in pwmOutputs:
     #    GPIO.setup(pin, GPIO.OUT)
     #    #TODO
+
+    # S0 counter
+    GPIO.add_event_detect(S0counter, GPIO.FALLING, 
+        callback=s0callback, bouncetime=50)
 
     # I2C Adafruit
     i2c_bus = board.I2C()
@@ -226,6 +242,8 @@ def machineCode():
     global airTemp, airHum
     global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
     global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
+    global s0kWhPerPulse, energyUsed
+    lastRunLight = False
 
     # Remember timestamp
     now = time.time()
@@ -307,7 +325,6 @@ def machineCode():
         # -----------------------------
         # Measure Air temp and humidity
         # -----------------------------
-        # TODO
         try:
             airTemp = airSensor.temperature
             airHum  = airSensor.relative_humidity
@@ -331,6 +348,20 @@ def machineCode():
         # Measure water level in reservoir
         # -----------------------------
         # TODO
+
+        # -----------------------------
+        # Energy used
+        # -----------------------------
+        # Remember in case we die
+        with open('GrassEnergyUsed.txt', 'w') as f:
+            f.write(str(energyUsed))
+        # Upload to MQTT
+        try:
+            topic = mqttTopicOutput + "energy"
+            infot = mqttc.publish(topic, str(energyUsed), qos=mqttQos)
+            infot.wait_for_publish()
+        except s0uploadException:
+            print("Uploading energy to MQTT didn't work!")
 
     # ---------------------------------
     # Heater
@@ -366,12 +397,25 @@ def machineCode():
     # ---------------------------------
     # Lighting
     # ---------------------------------
-    # TODO also PWM output
+    currentHour = datetime.datetime.now().hour
+    runLight    = currentHour > lightOnTime and currentHour < lightOffTime
+    if runLight and not lastRunlight:
+        print("Turning light on!")
+    elif not runlight and lastRunLight:
+        print("Turning light off!")
+    if runLight != lastRunLight:
+        try:
+            # Send light state
+            topic = mqttTopicOutput + "runlight"
+            infot = mqttc.publish(topic, str(runLight), qos=mqttQos)
+            infot.wait_for_publish()
+        except lightNotifierException:
+            print("Sending light state to MQTT didn't work!")
+    lastRunLight = runLight
 
     # ---------------------------------
     # Watering
     # ---------------------------------
-    soilMoistAvg = 9999
     # Never attempt watering if WateringPulseOff hasn't elapsed yet
     if now > lastWaterOff + wateringPulseOff:
         if soilMoistAvg < soilMoistSet:
@@ -385,12 +429,10 @@ def machineCode():
     # ---------------------------------
     # HW Output updates
     # ---------------------------------
-    # TODO
     GPIO.output(relayLight,     runLight)
     GPIO.output(relayHeater,    runHeater)
     GPIO.output(relayExhaust,   runExhaust)
     GPIO.output(relayCirc,      runFan)
-
 
 #############################################################################
 ##                               main()                                    ##
@@ -400,7 +442,15 @@ def main():
     print("---Starting  Grass---")
     print("---------------------")
 
-    global mqttOK
+    global mqttOK, energyUsed
+
+    # Read out remembered energy if present
+    try:
+        with open('GrassEnergyUsed.txt', 'r') as f:
+            energyUsed = float(f.read())
+            print("Read out " + str(energyUsed) + "kWh energy used from memory!")
+    except readEnergyException:
+        print("No energy memory present. Starting at 0kwh!")
 
     # Paho setup
     while not mqttOK:
