@@ -38,7 +38,7 @@ mqttQos         = 2
 
 # Machine parameters, set through recipe or MQTT outputs
 controlMode     = "local"
-airTempSet      = 20    # Air Temperature setpoint in C
+airTempSet      = 0     # Air Temperature setpoint in C
 airTempHyst     = 1     # Hysterysis for AirTemperature contoller
 airHumMax       = 90    # Maximum air humidity in % before ventilation starts
 soilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
