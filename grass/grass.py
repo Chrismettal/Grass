@@ -20,6 +20,7 @@ import paho.mqtt.client as mqtt
 import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
+import adafruit_bh1750
 import libds18b20
 import cv2
 
@@ -27,7 +28,8 @@ import cv2
 ##                           Global variables                              ##
 #############################################################################
 # General
-snapLocation    = "~/GrassSnaps/"
+snapLocation    = os.getenv('HOME') + "/GrassSnaps/"
+energyPath      = os.getenv('HOME') + "/GrassEnergyUsed.txt"
 
 # MQTT
 mqttTopicOutput = "grass/outputs/"
@@ -150,19 +152,21 @@ def pahoSetup():
 # Picture snapper
 #######################################
 def snapPicture():
-    global cam
+    global cam, snapLocation
     ret, image = cam.read()
     if not ret:
         print("failed to snap picture")
         return
-    cv2.imwrite(snapLocation + datetime.datetime.now(), image)
+    snapPath = snapLocation + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ".png"
+    print("Took snapshot to " + snapPath)
+    cv2.imwrite(snapPath, image)
     cam.release()
 
 #######################################
 # Sensor setup
 #######################################
 def sensorSetup():
-    global cam
+    global cam, lightSensor, airSensor, soilSensors
     global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
 
     # Pin setup
@@ -208,11 +212,10 @@ def sensorSetup():
     # Camera
     try:
         cam = cv2.VideoCapture(0)
-        cameraOK = FALSE #TODO
     except:
         print("Camera instancing didn't work!")
         cameraOK = False
-
+    
     # Upload detected sensor states to MQTT
     try:
         # Stemmas
@@ -239,13 +242,14 @@ def sensorSetup():
 #######################################
 def machineCode():
     # Import global vars
+    global cam, lightSensor, airSensor, soilSensors
     global lastCameraSnap, lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
     global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
     global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
     global s0kWhPerPulse, energyUsed
-    global lastRunLight
+    global lastRunLight, energyPath
 
     # Remember timestamp
     now = time.time()
@@ -312,9 +316,9 @@ def machineCode():
         # Measure light brightness
         # -----------------------------
         try:
-            # TODO print("%.2f Lux" % 123)
+            print("Light intensity: %.2f Lux" % lightSensor.lux)
             topic = mqttTopicOutput + "brightness"
-            infot = mqttc.publish(topic, str(123), qos=mqttQos) # TODO
+            infot = mqttc.publish(topic, str(lightSensor.lux), qos=mqttQos) # TODO
             infot.wait_for_publish()
         except:
             print("Reading or sending Light Sensor didn't work!")
@@ -357,7 +361,7 @@ def machineCode():
         # Energy used
         # -----------------------------
         # Remember in case we die
-        with open('GrassEnergyUsed.txt', 'w') as f:
+        with open(energyPath, 'w') as f:
             f.write(str(energyUsed))
         # Upload to MQTT
         try:
@@ -435,11 +439,11 @@ def main():
     print("---Starting  Grass---")
     print("---------------------")
 
-    global mqttOK, energyUsed
+    global mqttOK, energyUsed, energyPath
 
     # Read out remembered energy if present
     try:
-        with open('GrassEnergyUsed.txt', 'r') as f:
+        with open(energyPath, 'r') as f:
             energyUsed = float(f.read())
             print("Read out " + str(energyUsed) + "kWh energy used from memory!")
     except:
