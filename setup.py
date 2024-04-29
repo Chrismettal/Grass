@@ -6,6 +6,7 @@ if __name__ == "__main__":
         'paho-mqtt',
         'adafruit-circuitpython-seesaw',
         'adafruit-circuitpython-ahtx0',
+        'adafruit-circuitpython-bh1750',
         'opencv-python'
         ],
     )
