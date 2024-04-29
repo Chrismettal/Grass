@@ -21,7 +21,6 @@ import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
 import adafruit_bh1750
-import libds18b20
 import cv2
 
 #############################################################################
@@ -163,10 +162,23 @@ def snapPicture():
     cam.release()
 
 #######################################
+# Water temp sensor
+#######################################
+def ds18b20_read_temp():
+    global waterTempSensor
+    try:
+        with open(waterTempSensor, 'r') as f:
+            temp_String = f.read()
+        temp_c = float(temp_String) / 1000.0
+        return temp_c
+    except:
+        print("1-Wire reading failed!")
+
+#######################################
 # Sensor setup
 #######################################
 def sensorSetup():
-    global cam, lightSensor, airSensor, soilSensors
+    global cam, lightSensor, airSensor, soilSensors, waterTempSensor
     global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
 
     # Pin setup
@@ -191,8 +203,9 @@ def sensorSetup():
         try:
             ss = Seesaw(i2c_bus, addr=address)
             soilSensors.append(ss)
+            print("Stemma soil sensor " + hex(address) + " found!")
         except:
-            print("Stemma soil sensor " + str(address) + " not found!")
+            print("Stemma soil sensor " + hex(address) + " not found!")
             allStemmasOK = False
 
     # Light sensor
@@ -216,6 +229,15 @@ def sensorSetup():
         print("Camera instancing didn't work!")
         cameraOK = False
     
+    # Water temperature sensor
+    base_dir = '/sys/bus/w1/devices/'
+    try:
+        device_folder = glob.glob(base_dir + '28*')[0]
+        waterTempSensor = device_folder + '/temperature'
+        print("Found 1-Wire sensor: " + device_folder)
+    except:
+        print("No 1-Wire device found!")
+
     # Upload detected sensor states to MQTT
     try:
         # Stemmas
@@ -303,14 +325,15 @@ def machineCode():
         # -----------------------------
         # Measure water temp
         # -----------------------------
-        try:
-            waterTemp = ds18b20_read_temp()
+        #try:
+        waterTemp = ds18b20_read_temp()
+        print("Water temperature: " + str(waterTemp))
 
-            topic = mqttTopicOutput + "watertemp"
-            infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
-            infot.wait_for_publish()
-        except:
-            print("Reading water temperature didn't work!")
+        topic = mqttTopicOutput + "watertemp"
+        infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
+        infot.wait_for_publish()
+        #except:
+        #   print("Reading water temperature didn't work!")
 
         # -----------------------------
         # Measure light brightness
@@ -454,7 +477,7 @@ def main():
         try:
             pahoSetup()
         except:
-            print("Paho setup failed!")
+            print("MQTT connection failed! Retrying..")
         time.sleep(3)
 
     # Sensor setup
