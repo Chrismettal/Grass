@@ -116,6 +116,14 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 - [ ] MQTT output overrides
 - [ ] MQTT advertising
 
+## Camera
+
+- `sudo apt install motion`
+- Change config file to enable timelapse snapshots
+- `Change /lib/systemd/system/motion.service` to start in non-daemon mode 
+    - `ExecStart=/usr/bin/motion -n`
+- `sudo systemctl enable --now motion`
+
 ## Donations
 
 **If you like my work please consider [supporting me](https://github.com/Chrismettal#donations)!**

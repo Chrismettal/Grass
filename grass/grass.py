@@ -21,7 +21,6 @@ import board
 from adafruit_seesaw.seesaw import Seesaw
 import adafruit_ahtx0
 import adafruit_bh1750
-import cv2
 
 #############################################################################
 ##                           Global variables                              ##
@@ -47,12 +46,10 @@ airCircDuration = 30    # Duration of air circulation when triggered
 airCircTime     = 60    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
-cameraTime      = 15    # Time in minutes between camera pictures
 sensorInterval  = 30    # Interval to measure inputs in seconds
 s0kWhPerPulse   = 0.1   # kWH to be added to total counter per pulse
 
 # Machine thinking
-lastCameraSnap  = 1
 lastAirCirc     = 0
 runFan          = 0
 runHeater       = 0
@@ -68,7 +65,6 @@ lastRunLight    = False
 energyUsed      = 0.0   # Total energy used in kwh
 
 # Sensor states
-cameraOK        = True
 mqttOK          = False
 allStemmasOK    = True
 lightSensorOK   = True
@@ -178,8 +174,8 @@ def ds18b20_read_temp():
 # Sensor setup
 #######################################
 def sensorSetup():
-    global cam, lightSensor, airSensor, soilSensors, waterTempSensor
-    global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
+    global lightSensor, airSensor, soilSensors, waterTempSensor
+    global allStemmasOK, lightSensorOK, airSensorOK
 
     # Pin setup
     GPIO.setmode(GPIO.BCM)
@@ -222,13 +218,6 @@ def sensorSetup():
         print("Air sensor couldn't be found!")
         airSensorOK = False
 
-    # Camera
-    try:
-        cam = cv2.VideoCapture(0)
-    except:
-        print("Camera instancing didn't work!")
-        cameraOK = False
-    
     # Water temperature sensor
     base_dir = '/sys/bus/w1/devices/'
     try:
@@ -252,10 +241,6 @@ def sensorSetup():
         topic = mqttTopicOutput + "sensorstates/air"
         infot = mqttc.publish(topic, str(airSensorOK), qos=mqttQos)
         infot.wait_for_publish()
-        # Camera
-        topic = mqttTopicOutput + "sensorstates/camera"
-        infot = mqttc.publish(topic, str(cameraOK), qos=mqttQos)
-        infot.wait_for_publish()
     except:
         print("Sending sensor states to MQTT didn't work!")
 
@@ -264,29 +249,17 @@ def sensorSetup():
 #######################################
 def machineCode():
     # Import global vars
-    global cam, lightSensor, airSensor, soilSensors
-    global lastCameraSnap, lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
+    global  lightSensor, airSensor, soilSensors
+    global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
-    global airCircTime, lightSet, lightOn, cameraTime, sensorInterval
-    global cameraOK, allStemmasOK, lightSensorOK, airSensorOK
+    global airCircTime, lightSet, lightOn, sensorInterval
+    global allStemmasOK, lightSensorOK, airSensorOK
     global s0kWhPerPulse, energyUsed
     global lastRunLight, energyPath
 
     # Remember timestamp
     now = time.time()
-
-    # ---------------------------------
-    # Camera Snapshot
-    # ---------------------------------
-    if cameraOK and now > lastCameraSnap + (cameraTime * 60):
-        # Snap a pic
-        lastCameraSnap = now
-        print("Taking Snapshot")
-        try:
-            snapPicture()
-        except:
-            print("Taking picture didn't work!")
 
     # ---------------------------------
     # Measure sensors
@@ -449,6 +422,7 @@ def machineCode():
     # ---------------------------------
     # HW Output updates
     # ---------------------------------
+    runHeater = True
     GPIO.output(relayLight,     runLight)
     GPIO.output(relayHeater,    runHeater)
     GPIO.output(relayExhaust,   runExhaust)
