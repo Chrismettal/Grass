@@ -30,6 +30,8 @@ It features:
 
 - Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) for our sensor dependencies
 
+- As of 2024-04, you'll need to remove the default `RPi.GPIO` library via `sudo apt remove python3-rpi.gpio` before installing a forked version with `pip install rpi-lgpio` (potentially with `--break-system-packages`) since GPIO interrupts won't work in the base library version
+
 ### Pypi
 
 Might be pushed to Pypi later idk.
@@ -97,14 +99,14 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 - [x] GPIO working
 - [x] Light schedule works
 - [ ] All sensors can be read
-- [ ] Power meter works
-    - [ ] And saves its memory in the same place every time
+- [x] Power meter works
+    - [x] And saves its memory in the same place every time
 - [ ] Circulation logic works
 - [ ] Exhaust logic works
-- [ ] Heater logic works
+- [x] Heater logic works
 - [ ] Watering logic works
-- [ ] Timelapse feature works
-    - [ ] Camera still accessible as webcam stream
+- [x] Timelapse feature works (Via `motion`)
+    - [x] Camera still accessible as webcam stream 
 - [ ] All print statements become log statements
 - [ ] Autostart on machine boot
 - [ ] Oneshot MQTT states get sent cyclically

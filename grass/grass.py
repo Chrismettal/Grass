@@ -46,8 +46,8 @@ airCircDuration = 30    # Duration of air circulation when triggered
 airCircTime     = 60    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
-sensorInterval  = 30    # Interval to measure inputs in seconds
-s0kWhPerPulse   = 0.1   # kWH to be added to total counter per pulse
+sensorInterval  = 60    # Interval to measure inputs in seconds
+s0kWhPerPulse   = 0.001   # kWH to be added to total counter per pulse
 
 # Machine thinking
 lastAirCirc     = 0
@@ -63,6 +63,7 @@ lightOnTime     = 3     # Hour at which light is switched on
 lightOffTime    = 21    # Hour at which light is switched off
 lastRunLight    = False
 energyUsed      = 0.0   # Total energy used in kwh
+waterRequested  = False
 
 # Sensor states
 mqttOK          = False
@@ -104,9 +105,10 @@ SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 #######################################
 # S0 counter
 #######################################
-def s0callback():
+def s0callback(channel):
     global energyUsed
     energyUsed += s0kWhPerPulse
+    print("S0 pulse counted, energy used: " + "{:.3f}".format(energyUsed) + " kWh")
 
 #######################################
 # Paho connection established
@@ -120,7 +122,15 @@ def on_connect(client, userdata, flags, rc, properties=None):
 # Callback on received message
 #######################################
 def callback(client, userdata, message):
-    print("Message received: " + str(message.payload.decode("utf-8")))
+    global waterRequested
+
+    message = str(message.payload.decode("utf-8"))
+    print("Message received: " + message)
+
+    # Watering request
+    if message == "waternow":
+        waterRequested = True
+        
 
 #######################################
 # Subscription successful
@@ -186,10 +196,13 @@ def sensorSetup():
     #for pin in pwmOutputs:
     #    GPIO.setup(pin, GPIO.OUT)
     #    #TODO
-
+    
     # S0 counter
-    #GPIO.add_event_detect(S0counter, GPIO.FALLING, 
-    #    callback=s0callback, bouncetime=50)
+    GPIO.add_event_detect(
+        S0counter,
+        edge = GPIO.FALLING, 
+        callback = s0callback,
+        bouncetime = 100)
 
     # I2C Adafruit
     i2c_bus = board.I2C()
@@ -253,10 +266,10 @@ def machineCode():
     global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
-    global airCircTime, lightSet, lightOn, sensorInterval
+    global airCircTime, lightSet, lightOn
     global allStemmasOK, lightSensorOK, airSensorOK
     global s0kWhPerPulse, energyUsed
-    global lastRunLight, energyPath
+    global lastRunLight, energyPath, waterRequested
 
     # Remember timestamp
     now = time.time()
@@ -409,15 +422,14 @@ def machineCode():
     # ---------------------------------
     # Watering
     # ---------------------------------
-    # Never attempt watering if WateringPulseOff hasn't elapsed yet
-    if now > lastWaterOff + wateringPulseOff:
-        if allStemmasOK and soilMoistAvg < soilMoistSet:
-            GPIO.output(relayWater, True)
-            print("Water pump on")
-            time.sleep(wateringPulseOn) # (Blocking so we don't risk keeping water on)
-            GPIO.output(relayWater, False)
-            print("Water pump off")
-            lastWaterOff = now
+    if waterRequested:
+        waterRequested = False
+        GPIO.output(relayWater, True)
+        print("Water pump on")
+        time.sleep(wateringPulseOn) # (Blocking so we don't risk keeping water on)
+        GPIO.output(relayWater, False)
+        print("Water pump off")
+        
 
     # ---------------------------------
     # HW Output updates
@@ -442,7 +454,7 @@ def main():
     try:
         with open(energyPath, 'r') as f:
             energyUsed = float(f.read())
-            print("Read out " + str(energyUsed) + "kWh energy used from memory!")
+            print("Read out " + "{:.3f}".format(energyUsed) + " kWh energy used from memory!")
     except:
         print("No energy memory present. Starting at 0kwh!")
 
