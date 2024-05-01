@@ -30,8 +30,6 @@ It features:
 
 - Install [Adafruit Blinka](https://learn.adafruit.com/circuitpython-on-raspberrypi-linux/installing-circuitpython-on-raspberry-pi) for our sensor dependencies
 
-- Run `sudo apt install ffmpeg libsm6 libxext6` to get OpenCV dependencies
-
 ### Pypi
 
 Might be pushed to Pypi later idk.

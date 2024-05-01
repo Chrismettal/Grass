@@ -249,7 +249,7 @@ def sensorSetup():
 #######################################
 def machineCode():
     # Import global vars
-    global  lightSensor, airSensor, soilSensors
+    global lightSensor, airSensor, soilSensors
     global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
@@ -391,7 +391,7 @@ def machineCode():
     # Lighting
     # ---------------------------------
     currentHour = datetime.datetime.now().hour
-    runLight    = currentHour > lightOnTime and currentHour < lightOffTime
+    runLight    = currentHour >= lightOnTime and currentHour <= lightOffTime
     if runLight and not lastRunLight:
         print("Turning light on!")
     elif not runLight and lastRunLight:
