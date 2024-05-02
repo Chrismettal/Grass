@@ -404,7 +404,7 @@ def machineCode():
     # Lighting
     # ---------------------------------
     currentHour = datetime.datetime.now().hour
-    runLight    = currentHour >= lightOnTime and currentHour <= lightOffTime
+    runLight    = currentHour >= lightOnTime and currentHour < lightOffTime
     if runLight and not lastRunLight:
         print("Turning light on!")
     elif not runLight and lastRunLight:
