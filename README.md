@@ -95,26 +95,42 @@ This code is intended to be run on a [PiPLC](https://github.com/chrismettal/pipl
 
 ## Roadmap
 
-- [x] Create Roadmap
-- [x] GPIO working
-- [x] Light schedule works
-- [ ] All sensors can be read
-- [x] Power meter works
-    - [x] And saves its memory in the same place every time
-- [ ] Circulation logic works
-- [ ] Exhaust logic works
-- [x] Heater logic works
-- [ ] Watering logic works
+In no particular order
+
+- [x] GPIO working manually
 - [x] Timelapse feature works (Via `motion`)
     - [x] Camera still accessible as webcam stream 
 - [ ] All print statements become log statements
-- [ ] Autostart on machine boot
-- [ ] Oneshot MQTT states get sent cyclically
-- [ ] MQTT "last will" invalidate sensor states
-- [ ] Sensors that aren't present at machine start get detected without restart
-- [ ] Get control parameters through MQTT
-- [ ] MQTT output overrides
-- [ ] MQTT advertising
+- [ ] Parameter handling
+    - [ ] Control parameters and secrets saved in config struct/file
+    - [ ] Control parameters updated persistently through MQTT
+    - [ ] Current Control parameters uploaded to MQTT at connection time
+- [ ] Sensors
+    - [x] Power meter works
+    - [x] Air temperature / humidity can be read
+    - [x] Soil moisture / temperature can be read
+    - [ ] Water tank temperature can be read
+    - [ ] Water tank fill level can be read
+    - [ ] Sensors that aren't present at machine start get detected without restart
+- [ ] Actuators / Logic
+    - [x] Light schedule works
+    - [x] Heater logic works
+    - [ ] Circulation logic works
+    - [ ] Exhaust logic works
+    - [ ] Watering logic works
+    - [ ] All actuators log execution into MQTT
+- [ ] HomeAssistant
+    - [ ] Potential integration or at least shared dashboard configuration
+    - [ ] Alert on MQTT disconnect
+    - [ ] "Last will" to invalidate sensor states on disconnect
+    - [ ] Cyclic sending of sensor states in addition to on change
+    - [ ] Override on output
+    - [ ] MQTT advertising
+- [ ] Documentation
+    - [ ] "Motion" Camera
+    - [ ] Sensors used
+    - [ ] Parameters
+    - [ ] Autostart on machine boot
 
 ## Camera
 
