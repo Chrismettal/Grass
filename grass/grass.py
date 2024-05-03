@@ -5,13 +5,13 @@
 
 # Secrets
 import mqttsecrets
-
 # General libraries
 import os
 import sys
 import glob
 import time
 import datetime
+import logging
 # GPIO
 import RPi.GPIO as GPIO
 # MQTT
@@ -26,9 +26,10 @@ import adafruit_bh1750
 ##                           Global variables                              ##
 #############################################################################
 # General
-snapLocation    = os.getenv('HOME') + "/GrassSnaps/"
 energyPath      = os.getenv('HOME') + "/GrassEnergyUsed.txt"
+logPath         = os.getenv('HOME') + "/GrassLog.txt"
 THERMAL_PATH    = "/sys/class/thermal/thermal_zone0/temp"
+logger          = logging.getLogger(__name__)
 
 # MQTT
 mqttTopicOutput = "grass/outputs/"
@@ -43,7 +44,7 @@ airHumMax       = 90    # Maximum air humidity in % before ventilation starts
 soilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
 wateringPulseOn = 10    # How long the water can be turned on
 wateringPulseOff= 30    # How long the water needs to be off
-airCircDuration = 30    # Duration of air circulation when triggered
+airCircDuration = 60    # Duration of air circulation when triggered
 airCircTime     = 60    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
@@ -109,14 +110,14 @@ SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
 def s0callback(channel):
     global energyUsed
     energyUsed += s0kWhPerPulse
-    print("S0 pulse counted, energy used: " + "{:.3f}".format(energyUsed) + " kWh")
+    logger.info("S0 pulse counted, energy used: " + "{:.3f}".format(energyUsed) + " kWh")
 
 #######################################
 # Paho connection established
 #######################################
 def on_connect(client, userdata, flags, rc, properties=None):
     global mqttOK
-    print("Connection established")
+    logger.info("Connection established")
     mqttOK = True
 
 #######################################
@@ -126,7 +127,7 @@ def callback(client, userdata, message):
     global waterRequested
 
     message = str(message.payload.decode("utf-8"))
-    print("Message received: " + message)
+    logger.info("Message received: " + message)
 
     # ---------------------------------
     # MQTT Inputs
@@ -139,7 +140,7 @@ def callback(client, userdata, message):
 # Subscription successful
 #######################################
 def on_subscribe(client, userdata, mid, granted_ops, properties=None):
-    print("On subscribe called")
+    logger.info("On subscribe called")
 
 #######################################
 # Paho setup
@@ -157,20 +158,6 @@ def pahoSetup():
     mqttc.loop_start()
 
 #######################################
-# Picture snapper
-#######################################
-def snapPicture():
-    global cam, snapLocation
-    ret, image = cam.read()
-    if not ret:
-        print("failed to snap picture")
-        return
-    snapPath = snapLocation + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ".png"
-    print("Took snapshot to " + snapPath)
-    cv2.imwrite(snapPath, image)
-    cam.release()
-
-#######################################
 # Water temp sensor
 #######################################
 def ds18b20_read_temp():
@@ -181,7 +168,7 @@ def ds18b20_read_temp():
         temp_c = float(temp_String) / 1000.0
         return temp_c
     except:
-        print("1-Wire reading failed!")
+        logger.error("1-Wire reading failed!")
 
 #######################################
 # Sensor setup
@@ -215,23 +202,23 @@ def sensorSetup():
         try:
             ss = Seesaw(i2c_bus, addr=address)
             soilSensors.append(ss)
-            print("Stemma soil sensor " + hex(address) + " found!")
+            logger.info("Stemma soil sensor " + hex(address) + " found!")
         except:
-            print("Stemma soil sensor " + hex(address) + " not found!")
+            logger.error("Stemma soil sensor " + hex(address) + " not found!")
             allStemmasOK = False
 
     # Light sensor
     try:
         lightSensor = adafruit_bh1750.BH1750(i2c_bus)
     except:
-        print("Light sensor couldn't be added!")
+        logger.error("Light sensor couldn't be added!")
         lightSensorOK = False
 
     # Temp / Air hum sensor
     try:
         airSensor = adafruit_ahtx0.AHTx0(i2c_bus)
     except:
-        print("Air sensor couldn't be found!")
+        logger.error("Air sensor couldn't be found!")
         airSensorOK = False
 
     # Water temperature sensor
@@ -239,9 +226,9 @@ def sensorSetup():
     try:
         device_folder = glob.glob(base_dir + '28*')[0]
         waterTempSensor = device_folder + '/temperature'
-        print("Found 1-Wire sensor: " + device_folder)
+        logger.info("Found 1-Wire sensor: " + device_folder)
     except:
-        print("No 1-Wire device found!")
+        logger.error("No 1-Wire device found!")
 
     # Upload detected sensor states to MQTT
     try:
@@ -258,7 +245,7 @@ def sensorSetup():
         infot = mqttc.publish(topic, str(airSensorOK), qos=mqttQos)
         infot.wait_for_publish()
     except:
-        print("Sending sensor states to MQTT didn't work!")
+        logger.error("Sending sensor states to MQTT didn't work!")
 
 #######################################
 # Actual machine code
@@ -295,7 +282,7 @@ def machineCode():
                 soilMoist       = soilSensor.get_temp()
 
                 soilMoistAvg    = soilMoistAvg + soilMoist
-                print("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
+                logger.info("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
 
                 # Send moisture
                 topic = mqttTopicOutput + "bucketmoists/" + str(idx)
@@ -306,7 +293,7 @@ def machineCode():
                 infot = mqttc.publish(topic, str(soilTemp), qos=mqttQos)
                 infot.wait_for_publish()
             except:
-                print("Soil sensor " + str(idx) + " reading didn't work!")
+                logger.error("Soil sensor " + str(idx) + " reading didn't work!")
 
         if len(soilSensors) > 0:
             soilMoistAvg = soilMoistAvg / len(soilSensors)
@@ -314,26 +301,26 @@ def machineCode():
         # -----------------------------
         # Measure water temp
         # -----------------------------
-        #try:
-        waterTemp = ds18b20_read_temp()
-        print("Water temperature: " + str(waterTemp))
+        try:
+            waterTemp = ds18b20_read_temp()
+            logger.info("Water temperature: " + str(waterTemp))
 
-        topic = mqttTopicOutput + "watertemp"
-        infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
-        infot.wait_for_publish()
-        #except:
-        #   print("Reading water temperature didn't work!")
+            topic = mqttTopicOutput + "watertemp"
+            infot = mqttc.publish(topic, str(waterTemp), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+           logger.error("Reading water temperature didn't work!")
 
         # -----------------------------
         # Measure light brightness
         # -----------------------------
         try:
-            print("Light intensity: %.2f Lux" % lightSensor.lux)
+            logger.info("Light intensity: %.2f Lux" % lightSensor.lux)
             topic = mqttTopicOutput + "brightness"
             infot = mqttc.publish(topic, str(lightSensor.lux), qos=mqttQos) # TODO
             infot.wait_for_publish()
         except:
-            print("Reading or sending Light Sensor didn't work!")
+            logger.error("Reading or sending Light Sensor didn't work!")
 
         # -----------------------------
         # Measure Air temp and humidity
@@ -341,16 +328,16 @@ def machineCode():
         try:
             airTemp = airSensor.temperature
             airHum  = airSensor.relative_humidity
-            print("Air temperature: %0.1f C" % airTemp)
-            print("Air humidity: %0.1f %%" % airHum)
+            logger.info("Air temperature: %0.1f C" % airTemp)
+            logger.info("Air humidity: %0.1f %%" % airHum)
 
             # Heater
             if airTemp < (airTempSet - airTempHyst):
                 runHeater = 1
-                print("Heater On")
+                logger.info("Heater On")
             elif airTemp < (airTempSet + airTempHyst):
                 runHeater = 0
-                print("Heater Off")
+                logger.info("Heater Off")
 
             # Send humidity
             topic = mqttTopicOutput + "airhum"
@@ -361,7 +348,7 @@ def machineCode():
             infot = mqttc.publish(topic, str(airTemp), qos=mqttQos)
             infot.wait_for_publish()
         except:
-            print("Reading the air sensor didn't work!")
+            logger.info("Reading the air sensor didn't work!")
 
         # -----------------------------
         # Measure water level in reservoir
@@ -380,7 +367,7 @@ def machineCode():
             infot = mqttc.publish(topic, str(energyUsed), qos=mqttQos)
             infot.wait_for_publish()
         except:
-            print("Uploading energy to MQTT didn't work!")
+            logger.error("Uploading energy to MQTT didn't work!")
 
         # -----------------------------
         # SOC Temperature
@@ -388,13 +375,14 @@ def machineCode():
         with open(THERMAL_PATH, 'r') as f:
             socMilliDegrees = float(f.read())
             socTemp         = socMilliDegrees / 1000 
+            logger.info("Current SOC temperature: " + "{:.2f}".format(socTemp) + " °C")
         # Upload to MQTT
         try:
             topic = mqttTopicOutput + "telemetry/soctemp"
             infot = mqttc.publish(topic, str(socTemp), qos=mqttQos)
             infot.wait_for_publish()
         except:
-            print("Uploading SOC temperature to MQTT didn't work!")
+            logger.error("Uploading SOC temperature to MQTT didn't work!")
 
     # ---------------------------------
     # Circulation
@@ -408,7 +396,7 @@ def machineCode():
             # Turn fan off and remember circulation time
             runFan = 0
             lastAirCirc = now
-            print("Circulation finished")
+            logger.info("Circulation finished")
 
     # ---------------------------------
     # Exhaust
@@ -422,9 +410,9 @@ def machineCode():
     currentHour = datetime.datetime.now().hour
     runLight    = currentHour >= lightOnTime and currentHour < lightOffTime
     if runLight and not lastRunLight:
-        print("Turning light on!")
+        logger.info("Turning light on!")
     elif not runLight and lastRunLight:
-        print("Turning light off!")
+        logger.info("Turning light off!")
     if runLight != lastRunLight:
         try:
             # Send light state
@@ -432,7 +420,7 @@ def machineCode():
             infot = mqttc.publish(topic, str(runLight), qos=mqttQos)
             infot.wait_for_publish()
         except:
-            print("Sending light state to MQTT didn't work!")
+            logger.error("Sending light state to MQTT didn't work!")
     lastRunLight = runLight
 
     # ---------------------------------
@@ -441,10 +429,10 @@ def machineCode():
     if waterRequested:
         waterRequested = False
         GPIO.output(relayWater, True)
-        print("Water pump on")
+        logger.info("Water pump on")
         time.sleep(wateringPulseOn) # (Blocking so we don't risk keeping water on)
         GPIO.output(relayWater, False)
-        print("Water pump off")
+        logger.info("Water pump off")
         
 
     # ---------------------------------
@@ -460,26 +448,36 @@ def machineCode():
 ##                               main()                                    ##
 #############################################################################
 def main():
-    print("---------------------")
-    print("---Starting  Grass---")
-    print("---------------------")
-
     global mqttOK, energyUsed, energyPath
+
+    # Configure logger
+    logging.basicConfig(
+        filename    = logPath,
+        format      = "%(asctime)s | %(levelname)s | %(message)s",
+        datefmt     = "%Y-%m-%d %H:%M:%S",
+        encoding    = "utf-8",
+        level       = logging.DEBUG
+    )
+    logger.addHandler(logging.StreamHandler())
+
+    logger.info("---------------------")
+    logger.info("---Starting  Grass---")
+    logger.info("---------------------")
 
     # Read out remembered energy if present
     try:
         with open(energyPath, 'r') as f:
             energyUsed = float(f.read())
-            print("Read out " + "{:.3f}".format(energyUsed) + " kWh energy used from memory!")
+            logger.info("Read out " + "{:.3f}".format(energyUsed) + " kWh energy used from memory!")
     except:
-        print("No energy memory present. Starting at 0kwh!")
+        logger.warning("No energy memory present. Starting at 0kwh!")
 
     # Paho setup
     while not mqttOK:
         try:
             pahoSetup()
         except:
-            print("MQTT connection failed! Retrying..")
+            logger.error("MQTT connection failed! Retrying..")
         time.sleep(3)
 
     # Sensor setup
