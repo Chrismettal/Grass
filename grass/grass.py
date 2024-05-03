@@ -28,6 +28,7 @@ import adafruit_bh1750
 # General
 snapLocation    = os.getenv('HOME') + "/GrassSnaps/"
 energyPath      = os.getenv('HOME') + "/GrassEnergyUsed.txt"
+THERMAL_PATH    = "/sys/class/thermal/thermal_zone0/temp"
 
 # MQTT
 mqttTopicOutput = "grass/outputs/"
@@ -127,10 +128,12 @@ def callback(client, userdata, message):
     message = str(message.payload.decode("utf-8"))
     print("Message received: " + message)
 
+    # ---------------------------------
+    # MQTT Inputs
+    # ---------------------------------
     # Watering request
     if message == "waternow":
         waterRequested = True
-        
 
 #######################################
 # Subscription successful
@@ -360,7 +363,6 @@ def machineCode():
         except:
             print("Reading the air sensor didn't work!")
 
-
         # -----------------------------
         # Measure water level in reservoir
         # -----------------------------
@@ -379,6 +381,20 @@ def machineCode():
             infot.wait_for_publish()
         except:
             print("Uploading energy to MQTT didn't work!")
+
+        # -----------------------------
+        # SOC Temperature
+        # -----------------------------
+        with open(THERMAL_PATH, 'r') as f:
+            socMilliDegrees = float(f.read())
+            socTemp         = socMilliDegrees / 1000 
+        # Upload to MQTT
+        try:
+            topic = mqttTopicOutput + "telemetry/soctemp"
+            infot = mqttc.publish(topic, str(socTemp), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+            print("Uploading SOC temperature to MQTT didn't work!")
 
     # ---------------------------------
     # Circulation

@@ -22,6 +22,19 @@ It features:
 
 **If you like my work please consider [supporting me](https://github.com/Chrismettal#donations)!**
 
+## Table of contents <!-- omit in toc -->
+
+- [Installation](#installation)
+    - [Prerequisites](#prerequisites)
+    - [Pypi installation](#pypi-installation)
+    - [Manual installation (for development)](#manual-installation-for-development)
+- [Usage](#usage)
+- [GPIO mapping](#gpio-mapping)
+- [Roadmap](#roadmap)
+- [Camera](#camera)
+- [Donations](#donations)
+- [License](#license)
+
 ## Installation
 
 ### Prerequisites
@@ -32,11 +45,11 @@ It features:
 
 - As of 2024-04, you'll need to remove the default `RPi.GPIO` library via `sudo apt remove python3-rpi.gpio` before installing a forked version with `pip install rpi-lgpio` (potentially with `--break-system-packages`) since GPIO interrupts won't work in the base library version
 
-### Pypi
+### Pypi installation
 
 Might be pushed to Pypi later idk.
 
-### Local (for development)
+### Manual installation (for development)
 
 - Clone the repo:
 
@@ -112,6 +125,7 @@ In no particular order
     - [ ] Water tank temperature can be read
     - [ ] Water tank fill level can be read
     - [ ] Sensors that aren't present at machine start get detected without restart
+    - [ ] Telemetry sensors (CPU Temp, free space on disk..)
 - [ ] Actuators / Logic
     - [x] Light schedule works
     - [x] Heater logic works
