@@ -113,7 +113,7 @@ In no particular order
 - [x] GPIO working manually
 - [x] Timelapse feature works (Via `motion`)
     - [x] Camera still accessible as webcam stream 
-- [ ] All print statements become log statements
+- [x] All print statements become log statements
 - [ ] Parameter handling
     - [ ] Control parameters and secrets saved in config struct/file
     - [ ] Control parameters updated persistently through MQTT
@@ -122,10 +122,10 @@ In no particular order
     - [x] Power meter works
     - [x] Air temperature / humidity can be read
     - [x] Soil moisture / temperature can be read
-    - [ ] Water tank temperature can be read
+    - [x] Water tank temperature can be read
+    - [x] Telemetry sensors (CPU Temp, free space on disk..)
     - [ ] Water tank fill level can be read
     - [ ] Sensors that aren't present at machine start get detected without restart
-    - [ ] Telemetry sensors (CPU Temp, free space on disk..)
 - [ ] Actuators / Logic
     - [x] Light schedule works
     - [x] Heater logic works

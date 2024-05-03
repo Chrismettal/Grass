@@ -49,7 +49,8 @@ airCircTime     = 60    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
 sensorInterval  = 60    # Interval to measure inputs in seconds
-s0kWhPerPulse   = 0.001   # kWH to be added to total counter per pulse
+slowInterval    = 3600  # Interval for slow stuff
+s0kWhPerPulse   = 0.001 # kWH to be added to total counter per pulse
 
 # Machine thinking
 lastAirCirc     = 0
@@ -58,6 +59,7 @@ runHeater       = 0
 runLight        = 0
 lastWaterOff    = 0
 lastSensors     = 0
+lastSlow        = 0
 soilSensors     = []    # List of soil sensor entities
 topic           = ""
 payload         = ""
@@ -253,7 +255,7 @@ def sensorSetup():
 def machineCode():
     # Import global vars
     global lightSensor, airSensor, soilSensors
-    global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, soilSensors, topic, payload
+    global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, lastSlow, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
     global airTemp, airHum
     global airCircTime, lightSet, lightOn
@@ -383,6 +385,36 @@ def machineCode():
             infot.wait_for_publish()
         except:
             logger.error("Uploading SOC temperature to MQTT didn't work!")
+
+    # ---------------------------------
+    # Slow interval stuff
+    # ---------------------------------
+    if now > lastSlow + slowInterval:
+        lastSlow = now
+
+        # -----------------------------
+        # Free disk space in home
+        # -----------------------------
+        statvfs     = os.statvfs(os.getenv('HOME'))
+        diskSize    = statvfs.f_frsize * statvfs.f_blocks / 1024 / 1024 / 1024 # Size of filesystem in GB
+        diskFree    = statvfs.f_frsize * statvfs.f_bavail / 1024 / 1024 / 1024 # Free space in GB
+        diskPercent = 100 / diskSize * (diskSize - diskFree)
+        logger.info("Filesystem size: " + "{:.2f}".format(diskSize) + "GB")
+        logger.info("Filesystem free space: " + "{:.2f}".format(diskFree) + " GB")
+        logger.info("Filesystem percent used: " + "{:.0f}".format(diskPercent) + " %")
+        # Upload to MQTT
+        try:
+            topic = mqttTopicOutput + "telemetry/fssize"
+            infot = mqttc.publish(topic, "{:.2f}".format(diskSize), qos=mqttQos)
+            infot.wait_for_publish()
+            topic = mqttTopicOutput + "telemetry/fsfree"
+            infot = mqttc.publish(topic, "{:.2f}".format(diskFree), qos=mqttQos)
+            infot.wait_for_publish()
+            topic = mqttTopicOutput + "telemetry/fspercent"
+            infot = mqttc.publish(topic, "{:.0f}".format(diskPercent), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+            logger.error("Uploading disk usage to MQTT didn't work!")
 
     # ---------------------------------
     # Circulation
