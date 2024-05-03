@@ -38,8 +38,8 @@ mqttQos         = 2
 
 # Machine parameters, set through recipe or MQTT outputs
 controlMode     = "local"
-airTempSet      = 0     # Air Temperature setpoint in C
-airTempHyst     = 1     # Hysterysis for AirTemperature contoller
+airTempSet      = 20    # Air Temperature setpoint in C
+airTempHyst     = 0.5   # Hysterysis for AirTemperature contoller
 airHumMax       = 90    # Maximum air humidity in % before ventilation starts
 soilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found appropriate (200 .. 2000)
 wateringPulseOn = 10    # How long the water can be turned on
@@ -53,21 +53,23 @@ slowInterval    = 3600  # Interval for slow stuff
 s0kWhPerPulse   = 0.001 # kWH to be added to total counter per pulse
 
 # Machine thinking
-lastAirCirc     = 0
-runFan          = 0
-runHeater       = 0
-runLight        = 0
-lastWaterOff    = 0
-lastSensors     = 0
-lastSlow        = 0
-soilSensors     = []    # List of soil sensor entities
-topic           = ""
-payload         = ""
-lightOnTime     = 3     # Hour at which light is switched on 
-lightOffTime    = 21    # Hour at which light is switched off
-lastRunLight    = False
-energyUsed      = 0.0   # Total energy used in kwh
-waterRequested  = False
+lastAirCirc         = 0
+runFan              = 0
+runHeater           = 0
+runLight            = 0
+runExhaust          = 0
+lastWaterOff        = 0
+lastSensors         = 0
+lastSlow            = 0
+soilSensors         = []    # List of soil sensor entities
+topic               = ""
+payload             = ""
+lightOnTime         = 3     # Hour at which light is switched on 
+lightOffTime        = 21    # Hour at which light is switched off
+lastRunLight        = False
+energyUsed          = 0.0   # Total energy used in kwh
+waterRequested      = False
+exhaustRequested    = False
 
 # Sensor states
 mqttOK          = False
@@ -126,7 +128,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 # Callback on received message
 #######################################
 def callback(client, userdata, message):
-    global waterRequested
+    global waterRequested, exhaustRequested
 
     message = str(message.payload.decode("utf-8"))
     logger.info("Message received: " + message)
@@ -137,6 +139,10 @@ def callback(client, userdata, message):
     # Watering request
     if message == "waternow":
         waterRequested = True
+    elif message == "exhauston":
+        exhaustRequested = True
+    elif message == "exhaustoff":
+        exhaustRequested = False
 
 #######################################
 # Subscription successful
@@ -257,7 +263,7 @@ def machineCode():
     global lightSensor, airSensor, soilSensors
     global lastAirCirc, runFan, runHeater, runLight, lastWaterOff, lastSensors, lastSlow, soilSensors, topic, payload
     global controlMode, airTempSet, airTempHyst, airHumMax, soilMoistSet, wateringPulseOn, wateringPulseOff, airCircDuration
-    global airTemp, airHum
+    global airTemp, airHum, runExhaust
     global airCircTime, lightSet, lightOn
     global allStemmasOK, lightSensorOK, airSensorOK
     global s0kWhPerPulse, energyUsed
@@ -266,9 +272,9 @@ def machineCode():
     # Remember timestamp
     now = time.time()
 
-    # ---------------------------------
+    # #################################
     # Measure sensors
-    # ---------------------------------
+    # #################################
     if now > lastSensors + sensorInterval:
         lastSensors = now
 
@@ -350,7 +356,7 @@ def machineCode():
             infot = mqttc.publish(topic, str(airTemp), qos=mqttQos)
             infot.wait_for_publish()
         except:
-            logger.info("Reading the air sensor didn't work!")
+            logger.error("Reading or uploading the air sensor didn't work!")
 
         # -----------------------------
         # Measure water level in reservoir
@@ -386,29 +392,29 @@ def machineCode():
         except:
             logger.error("Uploading SOC temperature to MQTT didn't work!")
 
-    # ---------------------------------
+    # #################################
     # Slow interval stuff
-    # ---------------------------------
+    # #################################
     if now > lastSlow + slowInterval:
         lastSlow = now
 
         # -----------------------------
         # Free disk space in home
         # -----------------------------
-        statvfs     = os.statvfs(os.getenv('HOME'))
+        statvfs     = os.statvfs(os.getenv('HOME'))     # / KB   / MB   / GB
         diskSize    = statvfs.f_frsize * statvfs.f_blocks / 1024 / 1024 / 1024 # Size of filesystem in GB
         diskFree    = statvfs.f_frsize * statvfs.f_bavail / 1024 / 1024 / 1024 # Free space in GB
         diskPercent = 100 / diskSize * (diskSize - diskFree)
-        logger.info("Filesystem size: " + "{:.2f}".format(diskSize) + "GB")
-        logger.info("Filesystem free space: " + "{:.2f}".format(diskFree) + " GB")
+        logger.info("Filesystem size: " + "{:.3f}".format(diskSize) + "GB")
+        logger.info("Filesystem free space: " + "{:.3f}".format(diskFree) + " GB")
         logger.info("Filesystem percent used: " + "{:.0f}".format(diskPercent) + " %")
         # Upload to MQTT
         try:
             topic = mqttTopicOutput + "telemetry/fssize"
-            infot = mqttc.publish(topic, "{:.2f}".format(diskSize), qos=mqttQos)
+            infot = mqttc.publish(topic, "{:.3f}".format(diskSize), qos=mqttQos)
             infot.wait_for_publish()
             topic = mqttTopicOutput + "telemetry/fsfree"
-            infot = mqttc.publish(topic, "{:.2f}".format(diskFree), qos=mqttQos)
+            infot = mqttc.publish(topic, "{:.3f}".format(diskFree), qos=mqttQos)
             infot.wait_for_publish()
             topic = mqttTopicOutput + "telemetry/fspercent"
             infot = mqttc.publish(topic, "{:.0f}".format(diskPercent), qos=mqttQos)
@@ -416,6 +422,9 @@ def machineCode():
         except:
             logger.error("Uploading disk usage to MQTT didn't work!")
 
+    # #################################
+    # Actuators
+    # #################################
     # ---------------------------------
     # Circulation
     # ---------------------------------
@@ -428,36 +437,55 @@ def machineCode():
             # Turn fan off and remember circulation time
             runFan = 0
             lastAirCirc = now
-            logger.info("Circulation finished")
+            logger.info("Circulation executed")
 
     # ---------------------------------
     # Exhaust
     # ---------------------------------
-    # TODO
-    runExhaust = False
+    # Currently exhaust is only done manually on MQTT request
+    if exhaustRequested != runExhaust:
+        # Upload to MQTT
+        try:
+            topic = mqttTopicOutput + "exhaust"
+            infot = mqttc.publish(topic, str(exhaustRequested), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+            logger.error("Uploading exhaust state to MQTT didn't work!")
+        # Log requested state
+        if exhaustRequested:
+            logger.info("Turning exhaust on")
+        else:
+            logger.info("Turning exhaust off")
+        # Accept requested state
+        runExhaust = exhaustRequested
 
     # ---------------------------------
     # Lighting
     # ---------------------------------
+    # Lighting is turned on/off purely based on an on and off timer.
+    # Shadow at noon currently unsupported
     currentHour = datetime.datetime.now().hour
     runLight    = currentHour >= lightOnTime and currentHour < lightOffTime
-    if runLight and not lastRunLight:
-        logger.info("Turning light on!")
-    elif not runLight and lastRunLight:
-        logger.info("Turning light off!")
     if runLight != lastRunLight:
+        # Upload to MQTT
         try:
-            # Send light state
             topic = mqttTopicOutput + "runlight"
             infot = mqttc.publish(topic, str(runLight), qos=mqttQos)
             infot.wait_for_publish()
         except:
             logger.error("Sending light state to MQTT didn't work!")
-    lastRunLight = runLight
+        # Log requested state
+        if runLight:
+            logger.info("Turning light on!")
+        else:
+            logger.info("Turning light off!")
+        # Accept requested state
+        lastRunLight = runLight
 
     # ---------------------------------
     # Watering
     # ---------------------------------
+    # Currently watering is only done manually on MQTT request
     if waterRequested:
         waterRequested = False
         GPIO.output(relayWater, True)
@@ -466,11 +494,9 @@ def machineCode():
         GPIO.output(relayWater, False)
         logger.info("Water pump off")
         
-
-    # ---------------------------------
-    # HW Output updates
-    # ---------------------------------
-    runHeater = True
+    # #################################
+    # HW Output
+    # #################################
     GPIO.output(relayLight,     runLight)
     GPIO.output(relayHeater,    runHeater)
     GPIO.output(relayExhaust,   runExhaust)
