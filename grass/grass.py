@@ -54,10 +54,10 @@ s0kWhPerPulse   = 0.001 # kWH to be added to total counter per pulse
 
 # Machine thinking
 lastAirCirc         = 0
-runFan              = 0
-runHeater           = 0
-runLight            = 0
-runExhaust          = 0
+runFan              = False
+runHeater           = False
+runLight            = False
+runExhaust          = False
 lastWaterOff        = 0
 lastSensors         = 0
 lastSlow            = 0
@@ -342,10 +342,10 @@ def machineCode():
 
             # Heater
             if airTemp < (airTempSet - airTempHyst):
-                runHeater = 1
+                runHeater = True
                 logger.info("Heater On")
             elif airTemp < (airTempSet + airTempHyst):
-                runHeater = 0
+                runHeater = False
                 logger.info("Heater Off")
 
             # Send heater state
@@ -436,7 +436,7 @@ def machineCode():
     # If time since last circulation exceeded the setpoint:
     if now > lastAirCirc + (airCircTime * 60) and not runFan:
         # Turn fan on
-        runFan = 1
+        runFan = True
         logger.info("Turning circulation on")
         # Send circ state
         try:
@@ -448,7 +448,7 @@ def machineCode():
     # If time since last circulation exceeded the setpoint + fan duration:
     if now > lastAirCirc + (airCircTime * 60) + airCircDuration and runFan:
         # Turn fan off and remember circulation time
-        runFan = 0
+        runFan = False
         lastAirCirc = now
         logger.info("Turning circulation off")
         # Send circ state
