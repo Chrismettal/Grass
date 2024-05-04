@@ -348,6 +348,10 @@ def machineCode():
                 runHeater = 0
                 logger.info("Heater Off")
 
+            # Send heater state
+            topic = mqttTopicOutput + "runheater"
+            infot = mqttc.publish(topic, str(runHeater), qos=mqttQos)
+            infot.wait_for_publish()
             # Send humidity
             topic = mqttTopicOutput + "airhum"
             infot = mqttc.publish(topic, str(airHum), qos=mqttQos)
@@ -430,15 +434,30 @@ def machineCode():
     # Circulation
     # ---------------------------------
     # If time since last circulation exceeded the setpoint:
-    if now > lastAirCirc + (airCircTime * 60):
+    if now > lastAirCirc + (airCircTime * 60) and not runFan:
         # Turn fan on
         runFan = 1
-        # If time since last circulation exceeded the setpoint + fan duration:
-        if now > lastAirCirc + (airCircTime * 60) + (airCircDuration):
-            # Turn fan off and remember circulation time
-            runFan = 0
-            lastAirCirc = now
-            logger.info("Circulation executed")
+        logger.info("Turning circulation on")
+        # Send circ state
+        try:
+            topic = mqttTopicOutput + "runfan"
+            infot = mqttc.publish(topic, str(runFan), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+            logger.error("Uploading circulation state to MQTT didn't work!")
+    # If time since last circulation exceeded the setpoint + fan duration:
+    if now > lastAirCirc + (airCircTime * 60) + airCircDuration and runFan:
+        # Turn fan off and remember circulation time
+        runFan = 0
+        lastAirCirc = now
+        logger.info("Turning circulation off")
+        # Send circ state
+        try:
+            topic = mqttTopicOutput + "runFan"
+            infot = mqttc.publish(topic, str(runFan), qos=mqttQos)
+            infot.wait_for_publish()
+        except:
+            logger.error("Uploading circulation state to MQTT didn't work!")
 
     # ---------------------------------
     # Exhaust
