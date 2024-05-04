@@ -453,7 +453,7 @@ def machineCode():
         logger.info("Turning circulation off")
         # Send circ state
         try:
-            topic = mqttTopicOutput + "runFan"
+            topic = mqttTopicOutput + "runfan"
             infot = mqttc.publish(topic, str(runFan), qos=mqttQos)
             infot.wait_for_publish()
         except:
