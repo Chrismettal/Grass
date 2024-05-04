@@ -45,7 +45,7 @@ soilMoistSet    = 1000  # Soil moisture setpoint in whatever unit Adafruit found
 wateringPulseOn = 10    # How long the water can be turned on
 wateringPulseOff= 30    # How long the water needs to be off
 airCircDuration = 60    # Duration of air circulation when triggered
-airCircTime     = 60    # Time in minutes between air circulations
+airCircTime     = 30    # Time in minutes between air circulations
 lightSet        = 2000  # Target brightness in Lux
 lightOn         = 1     # Binary output of Light switch
 sensorInterval  = 60    # Interval to measure inputs in seconds
@@ -102,8 +102,8 @@ pwmCircFan      = 18    # PWM 1
 #############################################################################
 ##                           Global Constants                              ##
 #############################################################################
-# Stemma soil adresses
-SOIL_MOIST_ADR  = [0x36, 0x37, 0x38, 0x39]
+# Stemma soil adresses. 0x38 can't be used as 0x38 is already used by AHT20 and unchangeable
+SOIL_MOIST_ADR  = [0x36, 0x37, 0x39]
 
 #############################################################################
 ##                               Helpers                                   ##
@@ -286,11 +286,12 @@ def machineCode():
         for idx, soilSensor in enumerate(soilSensors):
             # Grab soil inputs
             try:
-                soilTemp        = soilSensor.moisture_read()
-                soilMoist       = soilSensor.get_temp()
+                soilMoist       = soilSensor.moisture_read() / 10
+                soilTemp        = soilSensor.get_temp()
+                # TODO what else can the soilSensor do?
 
                 soilMoistAvg    = soilMoistAvg + soilMoist
-                logger.info("Bucket " + str(idx) + ": Temperature: " + str(soilTemp) + ", Moisture: " + str(soilMoist))
+                logger.info("Bucket " + str(idx) + ": Temperature: " + "{:.2f}".format(soilTemp) + " °C, Moisture: " + "{:.1f}".format(soilMoist) + "%")
 
                 # Send moisture
                 topic = mqttTopicOutput + "bucketmoists/" + str(idx)
@@ -500,7 +501,7 @@ def machineCode():
     GPIO.output(relayLight,     runLight)
     GPIO.output(relayHeater,    runHeater)
     GPIO.output(relayExhaust,   runExhaust)
-    GPIO.output(relayCirc,      runFan)
+    GPIO.output(relayCirc,      runFan or runExhaust)
 
 #############################################################################
 ##                               main()                                    ##

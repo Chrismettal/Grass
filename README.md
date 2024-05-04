@@ -138,7 +138,7 @@ In no particular order
     - [ ] Alert on MQTT disconnect
     - [ ] "Last will" to invalidate sensor states on disconnect
     - [ ] Cyclic sending of sensor states in addition to on change
-    - [ ] Override on output
+    - [ ] Override outputs
     - [ ] MQTT advertising
 - [ ] Documentation
     - [ ] "Motion" Camera
