@@ -129,14 +129,14 @@ In no particular order
 - [ ] Actuators / Logic
     - [x] Light schedule works
     - [x] Heater logic works
-    - [ ] Circulation logic works
-    - [ ] Exhaust logic works
+    - [x] Circulation logic works
+    - [x] Exhaust logic works
     - [ ] Watering logic works
-    - [ ] All actuators log execution into MQTT
+    - [x] All actuators log execution into MQTT
 - [ ] HomeAssistant
+    - [x] Invalidate sensor states on disconnect (Done in )
     - [ ] Potential integration or at least shared dashboard configuration
     - [ ] Alert on MQTT disconnect
-    - [ ] "Last will" to invalidate sensor states on disconnect
     - [ ] Cyclic sending of sensor states in addition to on change
     - [ ] Override outputs
     - [ ] MQTT advertising
