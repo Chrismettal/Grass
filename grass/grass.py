@@ -122,6 +122,7 @@ def s0callback(channel):
 def on_connect(client, userdata, flags, rc, properties=None):
     global mqttOK
     logger.info("Connection established")
+    mqttc.subscribe(mqttTopicInput, qos=1)
     mqttOK = True
 
 #######################################
@@ -161,7 +162,6 @@ def pahoSetup():
     mqttc.on_subscribe = on_subscribe
     mqttc.username_pw_set(mqttsecrets.Username, mqttsecrets.Password)
     mqttc.connect(mqttsecrets.Broker, mqttsecrets.Port)
-    mqttc.subscribe(mqttTopicInput, qos=1)
     # Start the mqtt loop, no intension to ever end
     mqttc.loop_start()
 
